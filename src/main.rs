@@ -1,21 +1,13 @@
-fn main() {
-    println!("Hello, world!");
-}
+pub mod core;
 
-struct Rect {
-    width: u32,
-    height: u32,
-}
-impl Rect {
-    fn can_hold(&self, var: u32) -> bool {
-        var > self.width
+fn main() {
+    let n = core::Name { name: "Bob" };
+    let mut c: core::Entity = core::Entity::new_empty();
+    let mut c2: core::Entity = core::Entity::new_empty();
+
+    c.add(Box::new(n));
+    c.add(Box::new(c2));
+    for v in c.data() {
+        v.print();
     }
-}
-#[test]
-fn larger() {
-    let r = Rect {
-        width: 30,
-        height: 30,
-    };
-    assert!(r.can_hold(20));
 }
