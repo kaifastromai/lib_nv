@@ -1,6 +1,12 @@
+
 pub trait EntityAssociable {
     fn print(&self) {
         println!("Hello world");
+    }
+}
+pub trait Temperal{
+    fn print(&self){
+        println!("Temporal event!");
     }
 }
 
@@ -32,3 +38,45 @@ pub struct Name<'a> {
 impl EntityAssociable for Name<'_> {}
 
 impl EntityAssociable for Entity {}
+
+pub struct Timeline{
+
+}
+pub struct Arc{
+
+}
+pub struct Scene{
+
+}
+pub struct Location{
+
+}
+pub struct DescriptionField{
+
+}
+pub struct Event{
+
+}
+pub struct Image{
+
+}
+pub struct Video{
+
+}
+pub struct Audio{
+
+}
+pub struct TextFile{
+}
+pub struct Map{
+
+}
+pub struct Progression<'a>{
+    prev_progression:&'a Progression<'a>,
+    next_progression:&'a Progression<'a>
+
+}
+pub struct TextChunk{
+    buffer:&String,
+    
+}
