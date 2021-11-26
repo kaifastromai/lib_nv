@@ -1,9 +1,4 @@
-use std::collections::HashMap;
-
-use num::Integer;
-use uuid::Uuid;
-
-type EntityIndex = u128;
+use super::*;
 type EntitySignature = u16;
 const FIELD_COMPONENT_BITS: u16 = 0x1;
 const ENTITY_REFERENCE_BITS: u16 = 0x2;
@@ -15,13 +10,13 @@ const LOCATION_COMPONENT_BITS: u16 = 0x7;
 
 pub trait Component {
     fn get_component_bits() -> u16;
-    fn get_owning_entity(&self) -> Option<EntityIndex>;
-    fn set_owning_entity(&mut self, entity: Option<EntityIndex>);
+    fn get_owning_entity(&self) -> Option<IndexType>;
+    fn set_owning_entity(&mut self, entity: Option<IndexType>);
 }
 
 #[derive(Eq, Clone, Copy)]
-struct Entity {
-    _id: EntityIndex,
+pub struct Entity {
+    _id: IndexType,
     pub name: &'static str,
     pub signature: EntitySignature,
 }
@@ -46,7 +41,7 @@ impl<'a> Entity {
             signature: 0,
         }
     }
-    pub fn id(&self) -> EntityIndex {
+    pub fn id(&self) -> IndexType {
         self._id
     }
     pub fn add_component<T: Component>(&mut self, component: &mut T) {
@@ -64,13 +59,13 @@ impl<'a> Entity {
         self.signature
     }
 }
-struct EntityReferencesComponent {
-    _entity: Option<EntityIndex>,
-    pub entity_references: Vec<EntityIndex>,
+pub struct EntityReferencesComponent {
+    _entity: Option<IndexType>,
+    pub entity_references: Vec<IndexType>,
 }
 
 impl EntityReferencesComponent {
-    fn new(_entity: EntityIndex, entity_references: Vec<EntityIndex>) -> Self {
+    fn new(_entity: IndexType, entity_references: Vec<IndexType>) -> Self {
         Self {
             _entity: Some(_entity),
             entity_references,
@@ -82,10 +77,10 @@ impl EntityReferencesComponent {
             entity_references: vec![],
         }
     }
-    pub fn add_entity_reference(&mut self, entity_reference: EntityIndex) {
+    pub fn add_entity_reference(&mut self, entity_reference: IndexType) {
         self.entity_references.push(entity_reference);
     }
-    pub fn remove_entity_reference(&mut self, entity_reference: EntityIndex) {
+    pub fn remove_entity_reference(&mut self, entity_reference: IndexType) {
         self.entity_references.retain(|&x| x != entity_reference);
     }
 }
@@ -104,15 +99,15 @@ impl Component for EntityReferencesComponent {
     fn get_component_bits() -> u16 {
         ENTITY_REFERENCE_BITS
     }
-    fn get_owning_entity(&self) -> Option<EntityIndex> {
+    fn get_owning_entity(&self) -> Option<IndexType> {
         self._entity
     }
-    fn set_owning_entity(&mut self, entity: Option<EntityIndex>) {
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
         self._entity = entity;
     }
 }
 
-struct Field {
+pub struct Field {
     name: &'static str,
     value: &'static str,
 }
@@ -122,14 +117,14 @@ impl Field {
         Self { name, value }
     }
 }
-struct FieldsComponent {
-    _entity: Option<EntityIndex>,
+pub struct FieldsComponent {
+    _entity: Option<IndexType>,
     _mask: u16,
     fields: Vec<Field>,
 }
 
 impl FieldsComponent {
-    pub fn new(_entity: EntityIndex, name: &'static str, value: &'static str) -> Self {
+    pub fn new(_entity: IndexType, name: &'static str, value: &'static str) -> Self {
         FieldsComponent {
             _entity: Some(_entity),
             _mask: FIELD_COMPONENT_BITS,
@@ -143,6 +138,16 @@ impl FieldsComponent {
     pub fn add_field_struct(&mut self, field: Field) {
         self.fields.push(field);
     }
+    fn remove_field(&mut self, name: &'static str) {
+        self.fields.retain(|field| field.name != name);
+    }
+    fn get_field(&self, name: &'static str) -> Option<&'static str> {
+        self.fields.iter().find(|field| field.name == name).map(|field| field.value)
+    }
+    fn get_fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+    
 }
 //impl PartialEq and Hash for FieldsComponent based on entity id
 impl PartialEq for FieldsComponent {
@@ -160,18 +165,18 @@ impl Component for FieldsComponent {
     fn get_component_bits() -> u16 {
         FIELD_COMPONENT_BITS
     }
-    fn get_owning_entity(&self) -> Option<EntityIndex> {
+    fn get_owning_entity(&self) -> Option<IndexType> {
         self._entity
     }
-    fn set_owning_entity(&mut self, entity: Option<EntityIndex>) {
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
         self._entity = entity;
     }
 }
 
-struct EntityManager {
-    entities: HashMap<EntityIndex, Entity>,
-    fields_components: HashMap<EntityIndex, FieldsComponent>,
-    entity_references_components: HashMap<EntityIndex, EntityReferencesComponent>,
+pub struct EntityManager {
+    entities: HashMap<IndexType, Entity>,
+    fields_components: HashMap<IndexType, FieldsComponent>,
+    entity_references_components: HashMap<IndexType, EntityReferencesComponent>,
 }
 impl EntityManager {
     pub fn new() -> Self {
@@ -181,14 +186,14 @@ impl EntityManager {
             entity_references_components: HashMap::new(),
         }
     }
-    pub fn create_entity(&mut self, name: &'static str) -> EntityIndex {
+    pub fn create_entity(&mut self, name: &'static str) -> IndexType {
         let entity = Entity::new(name);
         self.entities.insert(entity.id(), entity);
         entity.id()
     }
     pub fn add_fields_component(
         &mut self,
-        entity: EntityIndex,
+        entity: IndexType,
         name: &'static str,
         value: &'static str,
     ) {
@@ -201,8 +206,8 @@ impl EntityManager {
     }
     pub fn add_entity_reference_component(
         &mut self,
-        entity: EntityIndex,
-        entity_reference: EntityIndex,
+        entity: IndexType,
+        entity_reference: IndexType,
     ) {
         let mut entity_references_component =
             EntityReferencesComponent::new(entity, vec![entity_reference]);
@@ -213,33 +218,30 @@ impl EntityManager {
         self.entity_references_components
             .insert(entity, entity_references_component);
     }
-    pub fn get_fields_component(&self, entity: EntityIndex) -> Option<&FieldsComponent> {
+    pub fn get_fields_component(&self, entity: IndexType) -> Option<&FieldsComponent> {
         self.fields_components.get(&entity)
     }
-    pub fn get_fields_component_mut(
-        &mut self,
-        entity: EntityIndex,
-    ) -> Option<&mut FieldsComponent> {
+    pub fn get_fields_component_mut(&mut self, entity: IndexType) -> Option<&mut FieldsComponent> {
         self.fields_components.get_mut(&entity)
     }
 
     pub fn get_entity_references_component(
         &self,
-        entity: EntityIndex,
+        entity: IndexType,
     ) -> Option<&EntityReferencesComponent> {
         self.entity_references_components.get(&entity)
     }
     pub fn get_entity_references_component_mut(
         &mut self,
-        entity: EntityIndex,
+        entity: IndexType,
     ) -> Option<&mut EntityReferencesComponent> {
         self.entity_references_components.get_mut(&entity)
     }
 
     pub fn remove_entity_reference_component(
         &mut self,
-        entity: EntityIndex,
-        entity_reference: EntityIndex,
+        entity: IndexType,
+        entity_reference: IndexType,
     ) {
         let mut entity_references_component =
             self.entity_references_components.get_mut(&entity).unwrap();
@@ -252,7 +254,7 @@ impl EntityManager {
             self.entity_references_components.remove(&entity);
         }
     }
-    pub fn get_entity_references(&self, entity: EntityIndex) -> Option<&Vec<EntityIndex>> {
+    pub fn get_entity_references(&self, entity: IndexType) -> Option<&Vec<IndexType>> {
         //check if entity has entity references component
         let entity = self.entities.get(&entity).unwrap();
         if entity.has_component::<EntityReferencesComponent>() {
@@ -263,7 +265,7 @@ impl EntityManager {
             None
         }
     }
-    pub fn get_fields(&self, entity: EntityIndex) -> Option<&Vec<Field>> {
+    pub fn get_fields(&self, entity: IndexType) -> Option<&Vec<Field>> {
         //check if entity has fields component
         let entity = self.entities.get(&entity).unwrap();
         if entity.has_component::<FieldsComponent>() {
@@ -274,22 +276,109 @@ impl EntityManager {
         }
     }
 
-    pub fn get_entity(&self, entity_index: EntityIndex) -> Option<&Entity> {
+    pub fn get_entity(&self, entity_index: IndexType) -> Option<&Entity> {
         self.entities.get(&entity_index)
     }
-    pub fn get_entity_mut(&mut self, entity_index: EntityIndex) -> Option<&mut Entity> {
+    pub fn get_entity_mut(&mut self, entity_index: IndexType) -> Option<&mut Entity> {
         self.entities.get_mut(&entity_index)
     }
+}pub struct Location {
+
 }
-pub struct Timeline {}
-pub struct Arc {}
-pub struct Scene {}
-pub struct LocationComponent {}
-pub struct Event {}
-pub struct Image {}
+pub struct LocationComponent {
+    _entity: Option<IndexType>,
+    location: Location,
+}
+impl LocationComponent {
+    pub fn new(_entity: IndexType, location: Location) -> Self {
+        LocationComponent {
+            _entity: Some(_entity),
+            location,
+        }
+    }
+}
+impl Component for LocationComponent {
+    fn get_component_bits() -> u16 {
+        LOCATION_COMPONENT_BITS
+    }
+    fn get_owning_entity(&self) -> Option<IndexType> {
+        self._entity
+    }
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
+        self._entity = entity;
+    }
+}
+//impl PartialEq and Hash for LocationComponent based on entity id
+impl PartialEq for LocationComponent {
+    fn eq(&self, other: &Self) -> bool {
+        self._entity == other._entity
+    }
+}
+impl std::hash::Hash for LocationComponent {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self._entity.hash(state);
+    }
+}
+pub struct TimeUnit<'a> {
+    name: &'static str,
+    related_unit: &'a TimeUnit<'a>,
+    related_unit_multiplier: f32,
+}
+pub trait TimeSystem {
+    fn walk_time_unit(&mut self) -> Vec<&TimeUnit>;
+}
+pub trait TimeTrait {
+    type TimeSystem: TimeSystem;
+}
+pub struct Time {}
+pub trait EventType {
+    fn get_event(&self) -> &dyn EventType;
+}
+struct EventTypeDuration {
+    start: Time,
+    end: Time,
+}
+impl EventTypeDuration {
+    fn new(start: Time, end: Time) -> Self {
+        EventTypeDuration { start, end }
+    }
+}
+impl EventType for EventTypeDuration {
+    fn get_event(&self) -> &dyn EventType {
+        self
+    }
+}
+
+struct EventTypeMoment {
+    moment: Time,
+}
+impl EventTypeMoment {
+    fn new(moment: Time) -> Self {
+        EventTypeMoment { moment }
+    }
+}
+impl EventType for EventTypeMoment {
+    fn get_event(&self) -> &dyn EventType {
+        self
+    }
+}
+pub struct Event<T: EventType> {
+    name: &'static str,
+    description: TextChunk,
+    time: Time,
+    involved_entities: Vec<IndexType>,
+    event_type: T,
+}
+pub struct Image<'a> {
+    id: IndexType,
+    name: &'static str,
+    description: TextChunk,
+    image_data: &'a [u8],
+}
 pub struct VideoComponent<'a> {
-    _entity: Option<EntityIndex>,
-    _mask: u16,
+    id: IndexType,
+    owning_entity: Option<IndexType>,
+    description: TextChunk,
     video_name: &'static str,
     video_type: &'static str,
     video_data: &'a [u8],
@@ -298,24 +387,38 @@ pub struct VideoComponent<'a> {
 //impl video component
 impl<'a> VideoComponent<'a> {
     pub fn new(
-        entity: Option<EntityIndex>,
-        mask: u16,
+        entity: Option<IndexType>,
         video_name: &'static str,
         video_type: &'static str,
         video_data: &'a [u8],
+        description: TextChunk,
     ) -> Self {
         VideoComponent {
-            _entity: entity,
-            _mask: mask,
+            id: Uuid::new_v4().as_u128(),
+            owning_entity: entity,
+            description,
             video_name,
             video_type,
             video_data,
         }
     }
 }
+impl Component for VideoComponent<'_> {
+    fn get_component_bits() -> u16 {
+        VIDEO_COMPONENT_BITS
+    }
+    fn get_owning_entity(&self) -> Option<IndexType> {
+        self.owning_entity
+    }
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
+        self.owning_entity = entity;
+    }
+}
 
 pub struct AudioComponent<'a> {
-    _entity: Option<EntityIndex>,
+    id: IndexType,
+    owning_entity: Option<IndexType>,
+    description: TextChunk,
     audio_name: &'static str,
     audio_type: &'static str,
     audio_data: &'a [u8],
@@ -323,28 +426,54 @@ pub struct AudioComponent<'a> {
 //impl audio component
 impl<'a> AudioComponent<'a> {
     pub fn new(
-        entity: Option<EntityIndex>,
+        entity: Option<IndexType>,
         audio_name: &'static str,
         audio_type: &'static str,
         audio_data: &'a [u8],
+        description: TextChunk,
     ) -> Self {
         AudioComponent {
-            _entity: entity,
+            id: Uuid::new_v4().as_u128(),
+            owning_entity: entity,
+            description,
             audio_name,
             audio_type,
             audio_data,
         }
     }
 }
+impl Component for AudioComponent<'_> {
+    fn get_component_bits() -> u16 {
+        AUDIO_COMPONENT_BITS
+    }
+    fn get_owning_entity(&self) -> Option<IndexType> {
+        self.owning_entity
+    }
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
+        self.owning_entity = entity;
+    }
+}
+//impl PartialEq for AudioComponent based on entity id and then implement Hash
+impl PartialEq for AudioComponent<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_owning_entity() == other.get_owning_entity()
+    }
+}
+impl std::hash::Hash for AudioComponent<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.get_owning_entity().hash(state);
+    }
+}
+
 pub struct NameComponent {
-    _entity: Option<EntityIndex>,
+    owning_entity: Option<IndexType>,
     name: &'static str,
     aliases: Vec<&'static str>,
 }
 impl NameComponent {
-    pub fn new(_entity: EntityIndex, name: &'static str) -> Self {
+    pub fn new(_entity: IndexType, name: &'static str) -> Self {
         NameComponent {
-            _entity: Some(_entity),
+            owning_entity: Some(_entity),
             name,
             aliases: Vec::new(),
         }
@@ -358,21 +487,38 @@ impl Component for NameComponent {
     fn get_component_bits() -> u16 {
         NAME_COMPONENT_BITS
     }
-    fn get_owning_entity(&self) -> Option<EntityIndex> {
-        self._entity
+    fn get_owning_entity(&self) -> Option<IndexType> {
+        self.owning_entity
     }
-    fn set_owning_entity(&mut self, entity: Option<EntityIndex>) {
-        self._entity = entity;
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
+        self.owning_entity = entity;
     }
 }
+
+//impl PartialEq and Hash for NameComponent based on entity id
+impl PartialEq for NameComponent {
+    fn eq(&self, other: &Self) -> bool {
+        self.owning_entity == other.owning_entity
+    }
+}
+//impl Hash for NameComponent based on entity id
+impl std::hash::Hash for NameComponent {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.owning_entity.hash(state);
+    }
+}
+
 pub struct BinaryDataComponent {
-    _entity: Option<EntityIndex>,
+    id: IndexType,
+    owning_entity: Option<IndexType>,
     data: Vec<u8>,
 }
+
 impl BinaryDataComponent {
-    pub fn new(_entity: EntityIndex, data: Vec<u8>) -> Self {
+    pub fn new(_entity: IndexType, data: Vec<u8>) -> Self {
         BinaryDataComponent {
-            _entity: Some(_entity),
+            id: Uuid::new_v4().as_u128(),
+            owning_entity: Some(_entity),
             data,
         }
     }
@@ -382,54 +528,22 @@ impl Component for BinaryDataComponent {
     fn get_component_bits() -> u16 {
         BINARY_DATA_COMPONENT_BITS
     }
-    fn get_owning_entity(&self) -> Option<EntityIndex> {
-        self._entity
+    fn get_owning_entity(&self) -> Option<IndexType> {
+        self.owning_entity
     }
-    fn set_owning_entity(&mut self, entity: Option<EntityIndex>) {
-        self._entity = entity;
-    }
-}
-
-pub struct TextFile {}
-pub struct Map {}
-pub struct Progression<'a> {
-    prev_progression: &'a Progression<'a>,
-    next_progression: &'a Progression<'a>,
-}
-pub struct TextChunk<'a> {
-    buffer: &'a String,
-}
-#[cfg(test)]
-mod test_super {
-    use super::*;
-
-    #[test]
-    fn test_add_entity() {
-        let mut entity_manager = EntityManager::new();
-        let entity_indx = entity_manager.create_entity("test");
-        let entity = entity_manager.get_entity(entity_indx).unwrap();
-
-        assert_eq!(entity.name, "test");
-    }
-    #[test]
-    fn test_add_fields_component() {
-        let mut entity_manager = EntityManager::new();
-        let entity_indx = entity_manager.create_entity("test");
-        entity_manager.add_fields_component(entity_indx, "name", "value");
-        let mut entity = entity_manager.get_entity(entity_indx).unwrap();
-        let mut fields_component = entity_manager
-            .get_fields_component_mut(entity_indx)
-            .unwrap();
-        fields_component.add_field("name", "value");
-        assert_eq!(fields_component.fields[0].name, "name");
+    fn set_owning_entity(&mut self, entity: Option<IndexType>) {
+        self.owning_entity = entity;
     }
 }
-mod utilies {
-    use core::num;
-
-    use ::num::Integer;
-
-    struct BitSet<T: Integer> {
-        _bits: T,
+//impl PartialEq and Hash for BinaryDataComponent based on entity id
+impl PartialEq for BinaryDataComponent {
+    fn eq(&self, other: &Self) -> bool {
+        self.owning_entity == other.owning_entity
+    }
+}
+//impl Hash for BinaryDataComponent based on entity id
+impl std::hash::Hash for BinaryDataComponent {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.owning_entity.hash(state);
     }
 }

@@ -1,0 +1,31 @@
+use super::*;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+#[test]
+fn test_range_deletion() {
+    let mut text = EditableText::new();
+    //open file test.rs
+    let path = Path::new("src/nv/text_edit/test.txt");
+    let display = path.display();
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", display, why),
+        Ok(file) => file,
+    };
+    //convert file to string
+    let mut s = String::new();
+    match file.read_to_string(&mut s) {
+        Err(why) => panic!("couldn't read {}: {}", display, why),
+        Ok(_) => println!("successfully read {}", display),
+    }
+    //set text to string
+    text.set_str(&s);
+    text.set_selection(Selection::new(
+        Location::new(0, 0),
+        text.text.get_last_location(),
+    ));
+    //delete range
+    text.delete_selection();
+    println!("{}", text.text);
+    //assert that the text is now empty
+    assert_eq!(text.text, "");
