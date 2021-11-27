@@ -225,7 +225,7 @@ impl EditableText {
                 i -= backward_path_len;
             }
         }
- 
+
         //iterate back to end of word
         while i > 0 && !WORD_BOUNDARY.contains(&self.text.chars().nth(i).unwrap()) {
             i -= 1;
@@ -240,6 +240,25 @@ impl EditableText {
         self.text.get_lines()[pos.line][word_start..word_end].to_string()
     }
     fn move_cursor_to_next_word() {}
+}
+///Represents a view into a subselection of an EditText, that will automatically update as the range changes
+struct TextView<'a> {
+    text: &'a str,
+
+    text_range: (usize, usize),
+    current_index: usize,
+}
+impl<'a> TextView<'a> {
+    fn new(text: &'a str, text_range: (usize, usize)) -> Self {
+        TextView {
+            text,
+            text_range,
+            current_index: 0,
+        }
+    }
+    fn get_range_string(&self) -> String {
+        String::from(&self.text[self.text_range.0..self.text_range.1])
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]

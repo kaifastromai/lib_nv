@@ -7,10 +7,12 @@ pub trait Region {
 pub mod proc_2d {
     ///A procedural 2D map image
     /// Because of the nature of the map, most of its interactivity must come from a UI frontend.
+    /// 
     /// The kernel only holds the serialzed data when dynamic editing of the map is finished by the end user
     struct MapProcedural2D {
         height: u32,
         width: u32,
+    
     }
     struct Coordinate2D {
         x: u32,
@@ -22,6 +24,7 @@ pub mod proc_2d {
     }
     struct Path2D {
         path: Vec<Coordinate2D>,
+
     }
 }
 

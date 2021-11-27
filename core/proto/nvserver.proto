@@ -1,0 +1,8 @@
+syntax = "proto3";
+package nvserver;
+
+service EntityService {
+  rpc create(Name) returns (EntityId) {}
+}
+message EntityId { string id = 1; }
+message Name { string name = 1; }
