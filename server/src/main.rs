@@ -1,6 +1,6 @@
 tonic::include_proto!("nvserver");
 
-use entity_service_server::*;
+use nv_server::*;
 use nvcore::ecs::EntityManager;
 use nvcore::Project;
 use std::sync::{Arc, Mutex};
@@ -19,9 +19,9 @@ impl NvServer {
     }
 }
 #[tonic::async_trait]
-impl EntityService for NvServer {
-    async fn create(&self, request: Request<Name>) -> Result<Response<EntityId>, Status> {
-        println!("create");
+impl Nv for NvServer {
+    async fn create_entity(&self, request: Request<Name>) -> Result<Response<EntityId>, Status> {
+        println!("adding new entity");
         let res = EntityId {
             id: self
                 .entity_manager
@@ -32,21 +32,33 @@ impl EntityService for NvServer {
         };
         Ok(Response::new(res))
     }
-}
-#[tonic::async_trait]
-impl project_server::Project for NvServer {
-    async fn create(&self, request: Request<ProjectParams>) -> Result<Response<EntityId>, Status> {
+    async fn create_project(
+        &self,
+        request: Request<ProjectRequest>,
+    ) -> Result<Response<EntityId>, Status> {
         let project_params = request.into_inner();
+        let mut p = self.project.lock().unwrap();
         //get id of project or create new one
-        let id = match self.project.lock().unwrap().as_ref() {
-            Some(e) => e.id,
+        let id = match p.as_ref() {
+            Some(e) => {
+                println!("project already exists");
+                return Err(Status::new(
+                    tonic::Code::AlreadyExists,
+                    "project already exists".to_string(),
+                ));
+            }
             None => {
+                println!("creating new project");
+
                 let project = Project::new(
                     project_params.name.as_str(),
                     project_params.description.as_str(),
                 );
-                self.project.lock().unwrap().replace(project);
-                self.project.lock().unwrap().as_ref().unwrap().id
+                p.replace(project);
+
+                let nid = p.as_ref().unwrap().id;
+                println!("created new project with id: {}", nid);
+                nid
             }
         };
 
@@ -55,14 +67,12 @@ impl project_server::Project for NvServer {
         Ok(Response::new(res))
     }
 }
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
     let service = NvServer::new();
     Server::builder()
-        .add_service(EntityServiceServer::new(service))
-        .add_service(project_server::ProjectServer::new(service))
+        .add_service(nv_server::NvServer::new(service))
         .serve(addr)
         .await?;
     Ok(())
