@@ -1,0 +1,33 @@
+syntax = "proto3";
+package nvserver;
+
+service Nv {
+  rpc create_project(ProjectRequest) returns (EntityId){}
+  rpc create_entity(Name) returns (EntityId) {}
+}
+message Entities { repeated EntityId ids = 1; }
+message EntityReferenceComponent{
+   EntityId entity_id = 1;
+   repeated EntityId entities=2;
+}
+
+message EntityId { string id = 1; }
+message Name { string name = 1; }
+message ProjectRequest {
+  string name = 1;
+  string description = 2;
+}
+message Field{
+  string name=1;
+  string value=2;
+}
+message FieldComponent{
+  EntityId entity_id = 1;
+  repeated Field fields=2;
+}
+message NameComponent{
+  EntityId entity_id=1;
+  string name=2;
+  repeated string aliases=3;
+}
+message Empty {}

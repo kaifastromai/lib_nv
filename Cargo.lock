@@ -92,19 +92,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "bitvec",
- "num",
- "prost",
- "tokio",
- "tonic",
- "tonic-build",
- "uuid",
-]
-
-[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -467,6 +454,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nvcore"
+version = "0.0.0"
+dependencies = [
+ "bitvec",
+ "num",
+ "uuid",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -677,6 +673,17 @@ name = "serde"
 version = "1.0.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f12d06de37cf59146fbdecab66aa99f9fe4f78722e3607577a5375d66bd0c913"
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "nvcore",
+ "prost",
+ "tokio",
+ "tonic",
+ "tonic-build",
+]
 
 [[package]]
 name = "slab"

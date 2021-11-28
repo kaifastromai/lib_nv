@@ -14,10 +14,10 @@ pub trait Component {
     fn set_owning_entity(&mut self, entity: Option<IndexType>);
 }
 
-#[derive(Eq, Clone, Copy)]
+#[derive(Eq, Clone)]
 pub struct Entity {
     _id: IndexType,
-    pub name: &'static str,
+    pub name: String,
     pub signature: EntitySignature,
 }
 //implement partialeq for entity based on id
@@ -34,10 +34,10 @@ impl std::hash::Hash for Entity {
 }
 
 impl<'a> Entity {
-    pub fn new(name: &'static str) -> Self {
+    pub fn new(name: &str) -> Self {
         Entity {
             _id: Uuid::new_v4().as_u128(),
-            name,
+            name: String::from(name),
             signature: 0,
         }
     }
@@ -142,12 +142,14 @@ impl FieldsComponent {
         self.fields.retain(|field| field.name != name);
     }
     fn get_field(&self, name: &'static str) -> Option<&'static str> {
-        self.fields.iter().find(|field| field.name == name).map(|field| field.value)
+        self.fields
+            .iter()
+            .find(|field| field.name == name)
+            .map(|field| field.value)
     }
     fn get_fields(&self) -> &Vec<Field> {
         &self.fields
     }
-    
 }
 //impl PartialEq and Hash for FieldsComponent based on entity id
 impl PartialEq for FieldsComponent {
@@ -165,6 +167,8 @@ impl Component for FieldsComponent {
     fn get_component_bits() -> u16 {
         FIELD_COMPONENT_BITS
     }
+
+    
     fn get_owning_entity(&self) -> Option<IndexType> {
         self._entity
     }
@@ -186,9 +190,9 @@ impl EntityManager {
             entity_references_components: HashMap::new(),
         }
     }
-    pub fn create_entity(&mut self, name: &'static str) -> IndexType {
-        let entity = Entity::new(name);
-        self.entities.insert(entity.id(), entity);
+    pub fn create_entity(&mut self, name: String) -> IndexType {
+        let entity:&Entity = &Entity::new(name.as_str());
+        self.entities.insert(entity.id(), entity.clone());
         entity.id()
     }
     pub fn add_fields_component(
@@ -282,9 +286,8 @@ impl EntityManager {
     pub fn get_entity_mut(&mut self, entity_index: IndexType) -> Option<&mut Entity> {
         self.entities.get_mut(&entity_index)
     }
-}pub struct Location {
-
 }
+pub struct Location {}
 pub struct LocationComponent {
     _entity: Option<IndexType>,
     location: Location,

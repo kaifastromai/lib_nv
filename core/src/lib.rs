@@ -105,18 +105,26 @@ impl std::hash::Hash for Manuscript {
     }
 }
 
-struct Project {
-    name: &'static str,
-    description: &'static str,
+pub struct Project {
+    pub id: IndexType,
+    name: String,
+    description: String,
     manuscripts: HashMap<IndexType, Manuscript>,
-    entity_manager: EntityManager,
 }
 impl Project {
-    pub fn new(name: &'static str, description: &'static str) -> Self {
+    pub fn new(name: &str, description: &str) -> Self {
         Project {
-            entity_manager: EntityManager::new(),
-            name,
-            description,
+            id: Uuid::new_v4().as_u128(),
+            name: String::from(name),
+            description: String::from(description),
+            manuscripts: HashMap::new(),
+        }
+    }
+    pub fn new_empty() -> Self {
+        Project {
+            id: Uuid::new_v4().as_u128(),
+            name: String::new(),
+            description: String::new(),
             manuscripts: HashMap::new(),
         }
     }
