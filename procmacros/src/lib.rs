@@ -1,15 +1,11 @@
 #![feature(proc_macro_diagnostic)]
 extern crate proc_macro;
 use proc_macro::{Diagnostic, Level, TokenStream};
-use quote::{__private::ext::RepToTokensExt, format_ident, quote};
+use quote::{format_ident, quote};
 use syn::{
     parse::{Parse, Parser},
     parse_macro_input, DeriveInput, Field,
 };
-use uuid::Uuid;
-fn get_static_int() -> u128 {
-    Uuid::new_v4().as_u128()
-}
 
 #[proc_macro_derive(Component)]
 pub fn component_derive(input: TokenStream) -> TokenStream {
@@ -119,38 +115,35 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
             })
             .unwrap(),
     );
-    match &mut input.fields {
-        syn::Fields::Named(fields) => {
-            fields.named.push(
-                syn::Field::parse_named
-                    .parse2(quote! {
-                        owning_entity:IndexType
-                    })
-                    .unwrap(),
-            );
-            fields.named.push(
-                syn::Field::parse_named
-                    .parse2(quote! {
-                        _is_marked_del:bool
-                    })
-                    .unwrap(),
-            );
-            fields.named.push(
-                syn::Field::parse_named
-                    .parse2(quote! {
-                        component_type:ComponentType
-                    })
-                    .unwrap(),
-            );
+    if let syn::Fields::Named(fields) = &mut input.fields {
+        fields.named.push(
+            syn::Field::parse_named
+                .parse2(quote! {
+                    owning_entity:IndexType
+                })
+                .unwrap(),
+        );
+        fields.named.push(
+            syn::Field::parse_named
+                .parse2(quote! {
+                    _is_marked_del:bool
+                })
+                .unwrap(),
+        );
+        fields.named.push(
+            syn::Field::parse_named
+                .parse2(quote! {
+                    component_type:ComponentType
+                })
+                .unwrap(),
+        );
 
-            quote! {
-                #input
-            }
-            .into()
+        quote! {
+            #input
         }
-        _ => {
-            panic!("Only structs with named fields are supported");
-        }
+        .into()
+    } else {
+        panic!("Only structs with named fields are supported");
     }
 }
 #[proc_macro_attribute]
@@ -185,16 +178,6 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                         })
                         .unwrap(),
                 );
-                //add the component type to the components struct
-                if let syn::Fields::Named(fields) = &mut components_struct.fields {
-                    fields.named.push(
-                        syn::Field::parse_named
-                            .parse2(quote! {
-                                #name:ComponentType
-                            })
-                            .unwrap(),
-                    );
-                }
                 //add component attribute to struct
                 struct_item.attrs.append(
                     &mut syn::Attribute::parse_outer
@@ -203,8 +186,19 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                         })
                         .unwrap(),
                 );
+                //add the component type to the components struct
+                if let syn::Fields::Named(fields) = &mut components_struct.fields {
+                    fields.named.push(
+                        syn::Field::parse_named
+                            .parse2(quote! {
+                                #name:std::collections::HashMap<IndexType,#name>
+                            })
+                            .unwrap(),
+                    );
+                }
             }
         }
+
         gen.extend(quote! {
             #component_types
         });
@@ -216,9 +210,10 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[allow(dead_code)]
         #[allow(non_snake_case)]
         #[allow(unused_imports)]
-
         #input
         #gen
+        #components_struct
+
     }
     .into()
 }

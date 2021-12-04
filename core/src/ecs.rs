@@ -9,6 +9,37 @@ pub mod components {
         name: String,
         pub fields: Vec<Field>,
     }
+    pub struct VideoComponent {
+        description: TextChunk,
+        video_name: String,
+        video_type: String,
+        video_data: Vec<u8>,
+    }
+
+    pub struct AudioComponent {
+        description: TextChunk,
+        audio_name: String,
+        audio_type: String,
+        audio_data: Vec<u8>,
+    }
+    pub struct NameComponent {
+        name: &'static str,
+        aliases: Vec<&'static str>,
+    }
+    impl NameComponent {
+        pub fn add_alias(&mut self, alias: &'static str) {
+            self.aliases.push(alias);
+        }
+    }
+    pub struct BinaryDataComponent {
+        data: Vec<u8>,
+    }
+    pub struct Image {
+        name: &'static str,
+        description: TextChunk,
+        image_data: Vec<u8>,
+    }
+
     pub struct References {}
     pub struct Name {}
 }
@@ -207,20 +238,6 @@ impl EntityManager {
         self.entities.get_mut(&entity_index)
     }
 }
-pub struct Location {}
-#[component]
-pub struct LocationComponent {
-    location: Location,
-}
-impl LocationComponent {
-    pub fn new(owning_entity: IndexType, location: Location) -> Self {
-        LocationComponent {
-            is_deleted: false,
-            owning_entity,
-            location,
-        }
-    }
-}
 
 pub struct TimeUnit<'a> {
     name: &'static str,
@@ -271,99 +288,4 @@ pub struct Event<T: EventType> {
     time: Time,
     involved_entities: Vec<IndexType>,
     event_type: T,
-}
-pub struct Image<'a> {
-    id: IndexType,
-    name: &'static str,
-    description: TextChunk,
-    image_data: &'a [u8],
-}
-#[component]
-pub struct VideoComponent {
-    description: TextChunk,
-    video_name: String,
-    video_type: String,
-    video_data: Vec<u8>,
-}
-
-//impl video component
-impl VideoComponent {
-    pub fn new(
-        owning_entity: IndexType,
-        video_name: String,
-        video_type: String,
-        video_data: Vec<u8>,
-        description: TextChunk,
-    ) -> Self {
-        VideoComponent {
-            is_deleted: false,
-            owning_entity,
-            description,
-            video_name,
-            video_type,
-            video_data,
-        }
-    }
-}
-
-#[component]
-pub struct AudioComponent {
-    description: TextChunk,
-    audio_name: String,
-    audio_type: String,
-    audio_data: Vec<u8>,
-}
-//impl audio component
-
-impl AudioComponent {
-    pub fn new(
-        owning_entity: IndexType,
-        audio_name: String,
-        audio_type: String,
-        audio_data: Vec<u8>,
-        description: TextChunk,
-    ) -> Self {
-        AudioComponent {
-            is_deleted: false,
-            owning_entity,
-            description,
-            audio_name,
-            audio_type,
-            audio_data,
-        }
-    }
-}
-
-#[component]
-pub struct NameComponent {
-    name: &'static str,
-    aliases: Vec<&'static str>,
-}
-impl NameComponent {
-    pub fn new(owning_entity: IndexType, name: &'static str) -> Self {
-        NameComponent {
-            is_deleted: false,
-            owning_entity,
-            name,
-            aliases: Vec::new(),
-        }
-    }
-    pub fn add_alias(&mut self, alias: &'static str) {
-        self.aliases.push(alias);
-    }
-}
-
-#[component]
-pub struct BinaryDataComponent {
-    data: Vec<u8>,
-}
-
-impl BinaryDataComponent {
-    pub fn new(owning_entity: IndexType, data: Vec<u8>) -> Self {
-        BinaryDataComponent {
-            is_deleted: false,
-            owning_entity,
-            data,
-        }
-    }
 }
