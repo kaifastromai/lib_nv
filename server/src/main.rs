@@ -3,7 +3,7 @@ tonic::include_proto!("nvserver");
 use nv_server::*;
 use nvcore::ecs::EntityManager;
 use nvcore::Project;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 
 pub struct NvServer {
@@ -40,7 +40,7 @@ impl Nv for NvServer {
         let mut p = self.project.lock().unwrap();
         //get id of project or create new one
         let id = match p.as_ref() {
-            Some(e) => {
+            Some(_) => {
                 println!("project already exists");
                 return Err(Status::new(
                     tonic::Code::AlreadyExists,

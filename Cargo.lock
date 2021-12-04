@@ -459,6 +459,16 @@ version = "0.0.0"
 dependencies = [
  "bitvec",
  "num",
+ "nvproc",
+ "uuid",
+]
+
+[[package]]
+name = "nvproc"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
  "uuid",
 ]
 

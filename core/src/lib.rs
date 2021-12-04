@@ -6,6 +6,7 @@ use uuid::Uuid;
 type IndexType = u128;
 
 pub mod ecs;
+pub mod text_edit;
 use ecs::EntityManager;
 pub trait MapType {
     fn get_map(&self) -> &dyn MapType;
