@@ -1,23 +1,42 @@
-use crate::ecs::Component;
+#![feature(more_qualified_paths)]
+
+use crate::ecs::{
+    components::{self, Name},
+    Component, Entity,
+};
 
 use super::*;
 
-// #[test]
-// fn test_add_entity() {
-//     let mut entity_manager = EntityManager::new();
-//     let entity_indx = entity_manager.create_entity(String::from("test"));
-//     let entity = entity_manager.get_entity(entity_indx).unwrap();
+#[test]
+fn test_add_comp_to_entity() {
+    let mut e = Entity::new("CompTest");
+    //add component
+    e.add_component::<components::Name>();
+    e.add_component::<components::Fields>();
+    assert!(e.has_component::<components::Name>());
+    assert!(e.has_component::<components::Fields>());
+    e.remove_component::<components::Name>();
+    assert!(!e.has_component::<components::Name>());
+    assert!(e.has_component::<components::Fields>());
+}
 
-//     assert_eq!(entity.entity_class, "test");
-// }
-// #[test]
-// fn test_add_component() {
-//     let mut entity_manager = EntityManager::new();
-//     let test_entity = entity_manager.create_entity(String::from("Entity1"));
+#[test]
+fn test_add_entity() {
+    let mut entity_manager = EntityManager::new();
+    let entity_indx = entity_manager.create_entity(String::from("test"));
+    let entity = entity_manager.get_entity(entity_indx).unwrap();
 
-//     let entity_index = entity_manager.create_entity(String::from("Character entity"));
-//     entity_manager.add_entity_reference_component(entity_index, test_entity);
-//     let res = entity_manager.get_entity_references_component(entity_index);
-//     assert_eq!(res.unwrap().get_owning_entity(), entity_index);
-// }
-
+    assert_eq!(entity.entity_class, "test");
+}
+#[test]
+fn test_add_component() {
+    let mut entity_manager = EntityManager::new();
+    let test_entity = entity_manager.create_entity(String::from("Entity1"));
+    entity_manager.add_component::<components::Name>(
+        test_entity,
+        ecs::Component::Properties {
+            name: "Bob",
+            aliases: vec!["Robert", "Rob"],
+        },
+    );
+}

@@ -1,3 +1,5 @@
+use std::{collections::BTreeSet, fmt::Debug};
+
 use super::*;
 type EntitySignature = u128;
 use nvproc::{self, component, gen_components, Component};
@@ -7,31 +9,31 @@ pub mod components {
     use super::*;
     pub struct Fields {
         name: String,
-        pub fields: Vec<Field>,
+        fields: Vec<Field>,
     }
-    pub struct VideoComponent {
+    pub struct Video {
         description: TextChunk,
         video_name: String,
         video_type: String,
         video_data: Vec<u8>,
     }
 
-    pub struct AudioComponent {
+    pub struct Audio {
         description: TextChunk,
         audio_name: String,
         audio_type: String,
         audio_data: Vec<u8>,
     }
-    pub struct NameComponent {
+    pub struct Name {
         name: &'static str,
         aliases: Vec<&'static str>,
     }
-    impl NameComponent {
+    impl Name {
         pub fn add_alias(&mut self, alias: &'static str) {
             self.aliases.push(alias);
         }
     }
-    pub struct BinaryDataComponent {
+    pub struct BinaryData {
         data: Vec<u8>,
     }
     pub struct Image {
@@ -41,7 +43,6 @@ pub mod components {
     }
 
     pub struct References {}
-    pub struct Name {}
 }
 
 pub trait Component {
@@ -51,13 +52,14 @@ pub trait Component {
     fn set_owning_entity(&mut self, entity: IndexType);
     fn set_is_deleted(&mut self, is_deleted: bool);
     fn get_is_deleted(&self) -> bool;
+    fn get_type() -> components::ComponentType;
 }
 
 #[derive(Eq, Clone)]
 pub struct Entity {
     _id: IndexType,
     pub entity_class: String,
-    pub signature: EntitySignature,
+    pub signature: BTreeSet<components::ComponentType>,
 }
 //implement partialeq for entity based on id
 impl PartialEq for Entity {
@@ -77,23 +79,23 @@ impl<'a> Entity {
         Entity {
             _id: Uuid::new_v4().as_u128(),
             entity_class: String::from(entity_class),
-            signature: 0,
+            signature: BTreeSet::new(),
         }
     }
     pub fn id(&self) -> IndexType {
         self._id
     }
-    pub fn add_component<T: Component>(&mut self, component: &mut T) {
-        todo!()
+    pub fn add_component<T: Component>(&mut self) {
+        self.signature.insert(T::get_type());
     }
-    pub fn remove_component<T: Component>(&mut self, component: &mut T) {
-        todo!()
+    pub fn remove_component<T: Component>(&mut self) {
+        self.signature.remove(&T::get_type());
     }
     pub fn has_component<T: Component>(&self) -> bool {
-        todo!()
+        self.signature.contains(&T::get_type())
     }
-    pub fn get_signature(&self) -> EntitySignature {
-        self.signature
+    pub fn get_signature(&self) -> Vec<&components::ComponentType> {
+        self.signature.iter().collect::<Vec<_>>()
     }
 }
 
@@ -108,30 +110,30 @@ impl Field {
     }
 }
 
-impl components::Fields {
-    pub fn add_field(&mut self, name: &'static str, value: &'static str) {
-        self.fields.push(Field { name, value });
-    }
-    pub fn add_field_struct(&mut self, field: Field) {
-        self.fields.push(field);
-    }
-    fn remove_field(&mut self, name: &'static str) {
-        self.fields.retain(|field| field.name != name);
-    }
-    fn get_field(&self, name: &'static str) -> Option<&'static str> {
-        self.fields
-            .iter()
-            .find(|field| field.name == name)
-            .map(|field| field.value)
-    }
-    fn get_fields(&self) -> &Vec<Field> {
-        &self.fields
-    }
-}
+// impl components::Fields {
+//     pub fn add_field(&mut self, name: &'static str, value: &'static str) {
+//         self.fields.push(Field { name, value });
+//     }
+//     pub fn add_field_struct(&mut self, field: Field) {
+//         self.fields.push(field);
+//     }
+//     fn remove_field(&mut self, name: &'static str) {
+//         self.fields.retain(|field| field.name != name);
+//     }
+//     fn get_field(&self, name: &'static str) -> Option<&'static str> {
+//         self.fields
+//             .iter()
+//             .find(|field| field.name == name)
+//             .map(|field| field.value)
+//     }
+//     fn get_fields(&self) -> &Vec<Field> {
+//         &self.fields
+//     }
+// }
 
 pub struct EntityManager {
     entities: HashMap<IndexType, Entity>,
-    components: Components,
+    components: components::Components,
 }
 impl EntityManager {
     pub fn new() -> Self {
@@ -145,7 +147,12 @@ impl EntityManager {
         self.entities.insert(entity.id(), entity.clone());
         entity.id()
     }
-    pub fn add_component<T: Component>(&mut self, entity: IndexType) {}
+    pub fn add_component<T: Component>(&mut self, entity: IndexType, props: T::Properties) {
+        let entity = self.entities.get_mut(&entity).unwrap();
+        entity.add_component::<T>();
+        //create actual component
+        let component = T::new(entity.id(), props);
+    }
     // pub fn add_fields_component(
     //     &mut self,
     //     entity: IndexType,
