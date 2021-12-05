@@ -6,6 +6,7 @@ use syn::{
     parse::{Parse, Parser},
     parse_macro_input, DeriveInput, Field,
 };
+use utils::StringExt;
 
 #[proc_macro_derive(Component)]
 pub fn component_derive(input: TokenStream) -> TokenStream {
@@ -32,8 +33,9 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
 
     let prop_name = format_ident!("{}_prop", name);
     let gen = quote! {
-        struct #prop_name {
-            #(#fields,)*
+        pub struct #prop_name {
+            #(pub #fields,)*
+
         }
 
         impl Component for #name {
@@ -56,6 +58,9 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
             }
             fn get_is_deleted(&self)->bool{
                 self._is_marked_del
+            }
+            fn get_type()->components::ComponentType{
+                components::ComponentType::#name
             }
 
         }
@@ -130,13 +135,6 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 })
                 .unwrap(),
         );
-        fields.named.push(
-            syn::Field::parse_named
-                .parse2(quote! {
-                    component_type:ComponentType
-                })
-                .unwrap(),
-        );
 
         quote! {
             #input
@@ -152,13 +150,16 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::ItemMod);
     let mut components_struct = syn::ItemStruct::parse
         .parse2(quote! {
-            struct Components {
+            #[derive(Default)]
+            pub struct Components {
             }
         })
         .unwrap();
     let mut component_types = syn::ItemEnum::parse
         .parse2(quote! {
-            enum ComponentType{
+            #[derive(Eq,PartialEq, Copy, Clone, Ord, PartialOrd)]
+            pub enum ComponentType{
+
 
             }
         })
@@ -168,19 +169,10 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         for item in content.1.iter_mut() {
             if let syn::Item::Struct(ref mut struct_item) = item {
                 let name = struct_item.ident.clone();
-                //convert name to camel case
-                let camel_name = name.to_string();
-                //split camel word on capital letters
-                let mut split_name = camel_name.split(|c: char| c.is_uppercase());
-                let mut component_name_string = String::new();
-                //iterate and skip the first split
-                for word in split_name.by_ref() {
-                    component_name_string.push_str(word.to_lowercase().as_str());
-                    component_name_string.push('_');
-                }
+                //convert name to snακε case
+                let snake_name = name.to_string().as_str().to_snake_case();
                 //create new Ident from string
-                let component_name =
-                    syn::Ident::new(component_name_string.trim_end_matches('_'), name.span());
+                let component_name = syn::Ident::new(snake_name.trim_end_matches('_'), name.span());
 
                 Diagnostic::new(Level::Note, format!("Generating data for {}", name)).emit();
                 //add the component type to the enum
