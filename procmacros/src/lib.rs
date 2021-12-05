@@ -152,7 +152,6 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::ItemMod);
     let mut components_struct = syn::ItemStruct::parse
         .parse2(quote! {
-            #[derive(nvproc::Component)]
             struct Components {
             }
         })
@@ -169,6 +168,20 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         for item in content.1.iter_mut() {
             if let syn::Item::Struct(ref mut struct_item) = item {
                 let name = struct_item.ident.clone();
+                //convert name to camel case
+                let camel_name = name.to_string();
+                //split camel word on capital letters
+                let mut split_name = camel_name.split(|c: char| c.is_uppercase());
+                let mut component_name_string = String::new();
+                //iterate and skip the first split
+                for word in split_name.by_ref() {
+                    component_name_string.push_str(word.to_lowercase().as_str());
+                    component_name_string.push('_');
+                }
+                //create new Ident from string
+                let component_name =
+                    syn::Ident::new(component_name_string.trim_end_matches('_'), name.span());
+
                 Diagnostic::new(Level::Note, format!("Generating data for {}", name)).emit();
                 //add the component type to the enum
                 component_types.variants.push(
@@ -191,7 +204,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                     fields.named.push(
                         syn::Field::parse_named
                             .parse2(quote! {
-                                #name:std::collections::HashMap<IndexType,#name>
+                                #component_name:std::collections::HashMap<IndexType,#name>
                             })
                             .unwrap(),
                     );
@@ -204,6 +217,20 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     }
     //add to gen
+    input.content.as_mut().unwrap().1.push(
+        syn::Item::parse
+            .parse2(quote! {
+                #gen
+            })
+            .unwrap(),
+    );
+    input.content.as_mut().unwrap().1.push(
+        syn::Item::parse
+            .parse2(quote! {
+                #components_struct
+            })
+            .unwrap(),
+    );
 
     quote! {
         #[allow(non_camel_case_types)]
@@ -211,9 +238,6 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[allow(non_snake_case)]
         #[allow(unused_imports)]
         #input
-        #gen
-        #components_struct
-
     }
     .into()
 }
