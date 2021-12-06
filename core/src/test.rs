@@ -1,7 +1,9 @@
 #![feature(more_qualified_paths)]
 
+use nvproc::component;
+
 use crate::ecs::{
-    components::{self, Name},
+    components::{self, Name, NameProp},
     Component, Entity,
 };
 
@@ -29,14 +31,18 @@ fn test_add_entity() {
     assert_eq!(entity.entity_class, "test");
 }
 #[test]
-fn test_add_component() {
+fn test_add_get_component() {
     let mut entity_manager = EntityManager::new();
     let test_entity = entity_manager.create_entity(String::from("Entity1"));
     entity_manager.add_component::<components::Name>(
         test_entity,
-        ecs::Component::Properties {
+        NameProp {
             name: "Bob",
             aliases: vec!["Robert", "Rob"],
         },
     );
+    let comp = entity_manager
+        .get_component::<components::Name>(test_entity)
+        .unwrap();
+    assert_eq!(comp.name, "Bob");
 }

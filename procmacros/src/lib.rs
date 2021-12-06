@@ -17,8 +17,7 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
     let private_fields = ["owning_entity", "_is_marked_del"];
 
     //get all fields of struct
-    let fields: Vec<Field> = if let syn::Data::Struct(data) = input.data {
-        //return iterator that ignores private fields
+    let mut fields: Vec<Field> = if let syn::Data::Struct(data) = input.data {
         data.fields
             .into_iter()
             .filter(|f| match &f.ident {
@@ -29,12 +28,18 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
     } else {
         panic!("{} must be struct", name)
     };
+    //make all fields public
+    for field in &mut fields {
+        field.vis = syn::Visibility::Public(syn::VisPublic {
+            pub_token: Default::default(),
+        });
+    }
     let field_names = fields.iter().map(|f| f.ident.as_ref().unwrap());
 
-    let prop_name = format_ident!("{}_prop", name);
+    let prop_name = format_ident!("{}Prop", name);
     let gen = quote! {
         pub struct #prop_name {
-            #(pub #fields,)*
+            #(#fields,)*
 
         }
 
@@ -147,14 +152,10 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 ///Generates a component type for every struct in the input module
 pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut snake_names = Vec::<String>::new();
+    let mut names = Vec::<syn::Ident>::new();
     let mut input = parse_macro_input!(item as syn::ItemMod);
-    let mut components_struct = syn::ItemStruct::parse
-        .parse2(quote! {
-            #[derive(Default)]
-            pub struct Components {
-            }
-        })
-        .unwrap();
+
     let mut component_types = syn::ItemEnum::parse
         .parse2(quote! {
             #[derive(Eq,PartialEq, Copy, Clone, Ord, PartialOrd)]
@@ -162,6 +163,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 
             }
+
         })
         .unwrap();
     let mut gen = quote! {};
@@ -171,8 +173,9 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                 let name = struct_item.ident.clone();
                 //convert name to snακε case
                 let snake_name = name.to_string().as_str().to_snake_case();
+                snake_names.push(snake_name);
+                names.push(name.clone());
                 //create new Ident from string
-                let component_name = syn::Ident::new(snake_name.trim_end_matches('_'), name.span());
 
                 Diagnostic::new(Level::Note, format!("Generating data for {}", name)).emit();
                 //add the component type to the enum
@@ -183,6 +186,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                         })
                         .unwrap(),
                 );
+
                 //add component attribute to struct
                 struct_item.attrs.append(
                     &mut syn::Attribute::parse_outer
@@ -191,16 +195,6 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                         })
                         .unwrap(),
                 );
-                //add the component type to the components struct
-                if let syn::Fields::Named(fields) = &mut components_struct.fields {
-                    fields.named.push(
-                        syn::Field::parse_named
-                            .parse2(quote! {
-                                #component_name:std::collections::HashMap<IndexType,#name>
-                            })
-                            .unwrap(),
-                    );
-                }
             }
         }
 
@@ -208,6 +202,45 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
             #component_types
         });
     }
+
+    //add impl block for Components that defines function get<T:Component>
+    let names_iter = names.iter();
+
+    let snake_iter: Vec<syn::Ident> = names_iter
+        .clone()
+        .map(|n| syn::Ident::new(n.to_string().as_str().to_snake_case().as_str(), n.span()))
+        .collect();
+    let sn = &snake_iter;
+    let n = &names;
+    Diagnostic::new(
+        Level::Note,
+        format!("Size of snake_names: {}", snake_names.len()),
+    )
+    .emit();
+    let impl_block = quote! {
+        impl Components{
+            pub fn get<T:crate::ecs::Component>(&self)->&HashMap<IndexType,T>{
+
+                let m:&HashMap<IndexType,T> =unsafe{match T::get_type(){
+                  //#(ecs::components:ComponentType:#names_iter)* =>&self.fields
+                  #(ecs::components::ComponentType::#n=>std::mem::transmute(&self.#sn),)*
+                  //ecs::components::ComponentType::Fields=>&self.fields,
+                }
+            };
+            m
+            }
+            pub fn get_mut<T:crate::ecs::Component>(&mut self)->&mut HashMap<IndexType,T>{
+                let m:&mut HashMap<IndexType,T> =unsafe{match T::get_type(){
+                  //#(ecs::components:ComponentType:#names_iter)* =>&self.fields
+                  #(ecs::components::ComponentType::#n=>std::mem::transmute(&mut self.#sn),)*
+                  //ecs::components::ComponentType::Fields=>&self.fields,
+                }
+            };
+            m
+            }
+        }
+    };
+
     //add to gen
     input.content.as_mut().unwrap().1.push(
         syn::Item::parse
@@ -216,10 +249,26 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
             })
             .unwrap(),
     );
+
+    let components_struct = quote! {
+        #[derive(Default)]
+        pub struct Components {
+            #(#sn:HashMap<IndexType,#n>,)*
+        }
+    };
+
     input.content.as_mut().unwrap().1.push(
         syn::Item::parse
             .parse2(quote! {
                 #components_struct
+            })
+            .unwrap(),
+    );
+
+    input.content.as_mut().unwrap().1.push(
+        syn::Item::parse
+            .parse2(quote! {
+                #impl_block
             })
             .unwrap(),
     );
@@ -230,6 +279,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[allow(non_snake_case)]
         #[allow(unused_imports)]
         #input
+
     }
     .into()
 }

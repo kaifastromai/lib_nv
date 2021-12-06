@@ -3,6 +3,11 @@ use std::{collections::BTreeSet, fmt::Debug};
 use super::*;
 type EntitySignature = u128;
 use nvproc::{self, component, gen_components, Component};
+pub struct Field {
+    name: String,
+    value: String,
+}
+
 
 #[gen_components]
 pub mod components {
@@ -10,6 +15,23 @@ pub mod components {
     pub struct Fields {
         name: String,
         fields: Vec<Field>,
+    }
+    impl components::Fields {
+        pub fn add_field(&mut self, name: &str, value: &str) {
+            self.fields.push(Field {
+                name: String::from(name),
+                value: String::from(value),
+            });
+        }
+        pub fn add_field_struct(&mut self, field: Field) {
+            self.fields.push(field);
+        }
+        fn remove_field(&mut self, name: &'static str) {
+            self.fields.retain(|field| field.name != name);
+        }
+        fn get_fields(&self) -> &Vec<Field> {
+            &self.fields
+        }
     }
     pub struct Video {
         description: TextChunk,
@@ -24,8 +46,9 @@ pub mod components {
         audio_type: String,
         audio_data: Vec<u8>,
     }
+
     pub struct Name {
-        name: &'static str,
+        pub name: &'static str,
         aliases: Vec<&'static str>,
     }
     impl Name {
@@ -99,37 +122,14 @@ impl<'a> Entity {
     }
 }
 
-pub struct Field {
-    name: &'static str,
-    value: &'static str,
-}
-
 impl Field {
-    fn new(name: &'static str, value: &'static str) -> Self {
-        Self { name, value }
+    fn new(name: &str, value: &str) -> Self {
+        Self {
+            name: String::from(name),
+            value: String::from(value),
+        }
     }
 }
-
-// impl components::Fields {
-//     pub fn add_field(&mut self, name: &'static str, value: &'static str) {
-//         self.fields.push(Field { name, value });
-//     }
-//     pub fn add_field_struct(&mut self, field: Field) {
-//         self.fields.push(field);
-//     }
-//     fn remove_field(&mut self, name: &'static str) {
-//         self.fields.retain(|field| field.name != name);
-//     }
-//     fn get_field(&self, name: &'static str) -> Option<&'static str> {
-//         self.fields
-//             .iter()
-//             .find(|field| field.name == name)
-//             .map(|field| field.value)
-//     }
-//     fn get_fields(&self) -> &Vec<Field> {
-//         &self.fields
-//     }
-// }
 
 pub struct EntityManager {
     entities: HashMap<IndexType, Entity>,
@@ -142,107 +142,49 @@ impl EntityManager {
             components: Default::default(),
         }
     }
-    pub fn create_entity(&mut self, name: String) -> IndexType {
-        let entity: &Entity = &Entity::new(name.as_str());
+    pub fn create_entity(&mut self, entity_class: String) -> IndexType {
+        let entity: &Entity = &Entity::new(entity_class.as_str());
         self.entities.insert(entity.id(), entity.clone());
         entity.id()
     }
     pub fn add_component<T: Component>(&mut self, entity: IndexType, props: T::Properties) {
-        let entity = self.entities.get_mut(&entity).unwrap();
-        entity.add_component::<T>();
+        let entity_ref = self.entities.get_mut(&entity).unwrap();
+        entity_ref.add_component::<T>();
         //create actual component
-        let component = T::new(entity.id(), props);
+        let component = T::new(entity_ref.id(), props);
+        //add component to entity
+        let c = self.components.get_mut::<T>();
+        c.insert(entity, component);
     }
-    // pub fn add_fields_component(
-    //     &mut self,
-    //     entity: IndexType,
-    //     name: &'static str,
-    //     value: &'static str,
-    // ) {
-    //     let mut fields_component = FieldsComponent::new(entity, name, value);
-    //     self.entities
-    //         .get_mut(&entity)
-    //         .unwrap()
-    //         .add_component(&mut fields_component);
-    //     self.fields_components.insert(entity, fields_component);
-    // }
-    // pub fn add_entity_reference_component(
-    //     &mut self,
-    //     entity: IndexType,
-    //     entity_reference: IndexType,
-    // ) {
-    //     let mut entity_references_component =
-    //         EntityReferencesComponent::new(entity, vec![entity_reference]);
-    //     self.entities
-    //         .get_mut(&entity)
-    //         .unwrap()
-    //         .add_component(&mut entity_references_component);
-    //     self.entity_references_components
-    //         .insert(entity, entity_references_component);
-    // }
-    // pub fn get_fields_component(&self, entity: IndexType) -> Option<&FieldsComponent> {
-    //     self.fields_components.get(&entity)
-    // }
-    // pub fn get_fields_component_mut(&mut self, entity: IndexType) -> Option<&mut FieldsComponent> {
-    //     self.fields_components.get_mut(&entity)
-    // }
-
-    // pub fn get_entity_references_component(
-    //     &self,
-    //     entity: IndexType,
-    // ) -> Option<&EntityReferencesComponent> {
-    //     self.entity_references_components.get(&entity)
-    // }
-    // pub fn get_entity_references_component_mut(
-    //     &mut self,
-    //     entity: IndexType,
-    // ) -> Option<&mut EntityReferencesComponent> {
-    //     self.entity_references_components.get_mut(&entity)
-    // }
-
-    // pub fn remove_entity_reference_component(
-    //     &mut self,
-    //     entity: IndexType,
-    //     entity_reference: IndexType,
-    // ) {
-    //     let mut entity_references_component =
-    //         self.entity_references_components.get_mut(&entity).unwrap();
-    //     entity_references_component.remove_entity_reference(entity_reference);
-    //     if entity_references_component.entity_references.is_empty() {
-    //         self.entities
-    //             .get_mut(&entity)
-    //             .unwrap()
-    //             .remove_component(entity_references_component);
-    //         self.entity_references_components.remove(&entity);
-    //     }
-    // }
-    // pub fn get_entity_references(&self, entity: IndexType) -> Option<&Vec<IndexType>> {
-    //     //check if entity has entity references component
-    //     let entity = self.entities.get(&entity).unwrap();
-    //     if entity.has_component::<EntityReferencesComponent>() {
-    //         let entity_references_component =
-    //             self.entity_references_components.get(&entity.id()).unwrap();
-    //         Some(&entity_references_component.entity_references)
-    //     } else {
-    //         None
-    //     }
-    // }
-    // pub fn get_fields(&self, entity: IndexType) -> Option<&Vec<Field>> {
-    //     //check if entity has fields component
-    //     let entity = self.entities.get(&entity).unwrap();
-    //     if entity.has_component::<FieldsComponent>() {
-    //         let fields_component = self.fields_components.get(&entity.id()).unwrap();
-    //         Some(&fields_component.fields)
-    //     } else {
-    //         None
-    //     }
-    // }
+    pub fn get_component<T: Component>(&self, entity: IndexType) -> Option<&T> {
+        let c = self.components.get::<T>();
+        c.get(&entity)
+    }
+    pub fn get_component_mut<T: Component>(&mut self, entity: IndexType) -> Option<&mut T> {
+        let c = self.components.get_mut::<T>();
+        c.get_mut(&entity)
+    }
 
     pub fn get_entity(&self, entity_index: IndexType) -> Option<&Entity> {
         self.entities.get(&entity_index)
     }
     pub fn get_entity_mut(&mut self, entity_index: IndexType) -> Option<&mut Entity> {
         self.entities.get_mut(&entity_index)
+    }
+    pub fn get_entities_by_class(&self, entity_class: &str) -> Vec<&Entity> {
+        self.entities
+            .values()
+            .filter(|entity| entity.entity_class == entity_class)
+            .collect::<Vec<_>>()
+    }
+    pub fn get_entities_by_class_mut(&mut self, entity_class: &str) -> Vec<&mut Entity> {
+        self.entities
+            .values_mut()
+            .filter(|entity| entity.entity_class == entity_class)
+            .collect::<Vec<_>>()
+    }
+    pub fn get_all_entities(&self) -> Vec<&Entity> {
+        self.entities.values().collect::<Vec<_>>()
     }
 }
 
