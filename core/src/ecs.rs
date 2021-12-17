@@ -8,7 +8,6 @@ pub struct Field {
     value: String,
 }
 
-
 #[gen_components]
 pub mod components {
     use super::*;
@@ -65,7 +64,9 @@ pub mod components {
         image_data: Vec<u8>,
     }
 
-    pub struct References {}
+    pub struct References {
+        entity_references: Vec<IndexType>,
+    }
 }
 
 pub trait Component {

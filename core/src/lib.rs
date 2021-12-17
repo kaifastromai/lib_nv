@@ -141,10 +141,10 @@ impl std::hash::Hash for Manuscript {
 
 pub struct Project {
     pub id: IndexType,
-    name: String,
-    description: String,
-    manuscripts: HashMap<IndexType, Manuscript>,
-    entity_manager: EntityManager,
+    pub name: String,
+    pub description: String,
+    pub manuscripts: HashMap<IndexType, Manuscript>,
+    pub entity_manager: EntityManager,
 }
 impl Project {
     pub fn new(name: &str, description: &str) -> Self {

@@ -1,33 +1,67 @@
 syntax = "proto3";
-package nvserver;
+package nvproto;
 
-service Nv {
-  rpc create_project(ProjectRequest) returns (EntityId){}
-  rpc create_entity(Name) returns (EntityId) {}
-}
-message Entities { repeated EntityId ids = 1; }
-message EntityReferenceComponent{
-   EntityId entity_id = 1;
-   repeated EntityId entities=2;
+enum ComponentType {
+  FIELDS = 0;
+  REFERENCES = 1;
+  VIDEO = 2;
+  AUDIO = 3;
+  NAME = 4;
+  BINARY_DATA = 5;
+  IMAGE = 6;
 }
 
-message EntityId { string id = 1; }
+service Project {
+  rpc createProject(ProjectMessage.Create) returns (EntityResponse) {}
+  rpc getProject(ProjectMessage.Get) returns (ProjectMessage.Response) {}
+  rpc getEntity(EntityRequest) returns (FullEntityResponse) {}
+  rpc addComponent(ComponentRequest) returns (EntityResponse) {}
+  rpc removeComponent(RemoveComponentRequest) returns (EntityResponse) {}
+  rpc addEntity(Name) returns (EntityResponse) {}
+}
+message ProjectMessage {
+  message Get { string id = 1; }
+  message Create {
+    string name = 1;
+    string description = 2;
+  }
+  message Response {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+  }
+}
+service Entity {
+  rpc getEntity(EntityRequest) returns (FullEntityResponse) {}
+  rpc addComponent(ComponentRequest) returns (EntityResponse) {}
+  rpc removeComponent(RemoveComponentRequest) returns (EntityResponse) {}
+  rpc addEntity(Name) returns (EntityResponse) {}
+}
+message ComponentRequest { ComponentType component_type = 1;
+string entity_id = 2; }
+service Component {
+  rpc getReference(ReferenceRequest) returns (ReferenceResponse) {}
+  rpc getName(NameRequest) returns (NameResponse) {}
+}
+message NameRequest { string entity_id = 1; }
+message NameResponse { string name = 1; }
+
+message RemoveComponentRequest {
+  ComponentType type = 1;
+  string entity_id = 2;
+}
+
+message ReferenceResponse { repeated string entity_id = 1; }
+message ReferenceRequest { string entity_id = 1; }
+message EntityReferenceComponent {
+  string entity_id = 1;
+  repeated string entities = 2;
+}
+message FullEntityResponse {
+  string id = 1;
+  string name = 2;
+  repeated ComponentType signature = 3;
+}
+message EntityRequest { string id = 1; }
+message EntityResponse { string id = 1; }
 message Name { string name = 1; }
-message ProjectRequest {
-  string name = 1;
-  string description = 2;
-}
-message Field{
-  string name=1;
-  string value=2;
-}
-message FieldComponent{
-  EntityId entity_id = 1;
-  repeated Field fields=2;
-}
-message NameComponent{
-  EntityId entity_id=1;
-  string name=2;
-  repeated string aliases=3;
-}
-message Empty {}
