@@ -171,7 +171,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         for item in content.1.iter_mut() {
             if let syn::Item::Struct(ref mut struct_item) = item {
                 let name = struct_item.ident.clone();
-                //convert name to snακε case
+                //convert name to snake case
                 let snake_name = name.to_string().as_str().to_snake_case();
                 snake_names.push(snake_name);
                 names.push(name.clone());

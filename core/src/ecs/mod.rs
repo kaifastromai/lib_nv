@@ -1,3 +1,6 @@
+mod archetypes;
+pub mod prelude;
+
 use std::{collections::BTreeSet, fmt::Debug};
 
 use super::*;
@@ -6,6 +9,9 @@ use nvproc::{self, component, gen_components, Component};
 pub struct Field {
     name: String,
     value: String,
+}
+pub struct Hierarchy{
+    
 }
 
 #[gen_components]
@@ -31,6 +37,11 @@ pub mod components {
         fn get_fields(&self) -> &Vec<Field> {
             &self.fields
         }
+    }
+    //A component that describes a hierachical relationship between entities (family members, Locations (country->city->town)), races, etc...
+    pub struct HierarchichalTree{
+        
+
     }
     pub struct Video {
         description: TextChunk,

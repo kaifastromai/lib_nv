@@ -1,5 +1,7 @@
 #![feature(more_qualified_paths)]
 
+use std::collections::BTreeSet;
+
 use nvproc::component;
 
 use crate::ecs::{
@@ -45,4 +47,13 @@ fn test_add_get_component() {
         .get_component::<components::Name>(test_entity)
         .unwrap();
     assert_eq!(comp.name, "Bob");
+}
+#[test]
+fn test_b_tree() {
+    let btree = BTreeSet::<u32>::from_iter(vec![11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    assert_eq!(btree.len(), 11);
+    //print the tree
+    for i in btree.iter() {
+        println!("{}", i);
+    }
 }

@@ -51,8 +51,28 @@ message RemoveComponentRequest {
   string entity_id = 2;
 }
 
-message ReferenceResponse { repeated string entity_id = 1; }
+message ReferenceResponse { 
+  repeated string entity_id = 2; 
+}
+message ReferenceRequest {
+  string entity_id = 2;
+}
+message ReferenceUpdateRequet {
+  string entity_id = 1;
+  repeated string entity_id = 2;
+  
+}
 message ReferenceRequest { string entity_id = 1; }
+message FieldResponse {
+  string name = 1;
+  string value = 2;
+}
+message UpdateFieldRequest {
+  string entity_id = 1;
+  string name = 2;
+  string value = 3;
+}
+
 message EntityReferenceComponent {
   string entity_id = 1;
   repeated string entities = 2;

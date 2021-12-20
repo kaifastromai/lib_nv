@@ -36,8 +36,8 @@ impl entity_server::Entity for NvServer {
                     .signature
                     .iter()
                     .map(|c| {
-                        let i = *c as i32;
-                        i
+                        
+                        *c as i32
                     })
                     .collect(),
             })),
