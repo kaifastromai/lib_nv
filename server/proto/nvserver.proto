@@ -55,14 +55,13 @@ message ReferenceResponse {
   repeated string entity_id = 2; 
 }
 message ReferenceRequest {
-  string entity_id = 2;
+  string entity_id = 1;
 }
 message ReferenceUpdateRequet {
   string entity_id = 1;
-  repeated string entity_id = 2;
+  repeated string references = 2;
   
 }
-message ReferenceRequest { string entity_id = 1; }
 message FieldResponse {
   string name = 1;
   string value = 2;

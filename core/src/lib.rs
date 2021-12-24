@@ -3,11 +3,12 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-type IndexType = u128;
+pub type IndexType = u128;
 pub trait Referanceable {
     fn referance_name(&self) -> String;
     fn referance_id(&self) -> IndexType;
 }
+pub mod action;
 pub mod ecs;
 pub mod text_edit;
 use ecs::EntityManager;
@@ -38,7 +39,6 @@ pub struct Progression {
     involved_entities: Vec<IndexType>,
     text: TextChunk,
     ordering: u32,
-
 }
 //impl Progression
 impl Progression {

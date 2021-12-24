@@ -1,7 +1,7 @@
 #![feature(proc_macro_diagnostic)]
 extern crate proc_macro;
 use proc_macro::{Diagnostic, Level, TokenStream};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse::{Parse, Parser},
     parse_macro_input, DeriveInput, Field,
@@ -121,7 +121,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     input.attrs.append(
         &mut syn::Attribute::parse_outer
             .parse2(quote! {
-                #[derive(nvproc::Component)]
+                #[derive(nvproc::Component, Clone)]
             })
             .unwrap(),
     );
@@ -160,17 +160,23 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         .parse2(quote! {
             #[derive(Eq,PartialEq, Copy, Clone, Ord, PartialOrd)]
             pub enum ComponentType{
-
-
             }
-
+        })
+        .unwrap();
+    let mut component_refs = syn::ItemEnum::parse
+        .parse2(quote! {
+            //An enum that holds references to a components
+            pub enum ComponentRef<'a>{
+            }
         })
         .unwrap();
     let mut gen = quote! {};
     for content in input.content.iter_mut() {
         for item in content.1.iter_mut() {
             if let syn::Item::Struct(ref mut struct_item) = item {
-                let name = struct_item.ident.clone();
+                let item = struct_item;
+
+                let name = item.ident.clone();
                 //convert name to snake case
                 let snake_name = name.to_string().as_str().to_snake_case();
                 snake_names.push(snake_name);
@@ -186,9 +192,16 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                         })
                         .unwrap(),
                 );
+                component_refs.variants.push(
+                    syn::Variant::parse
+                        .parse2(quote! {
+                           #name (&'a components:: #name)
+                        })
+                        .unwrap(),
+                );
 
                 //add component attribute to struct
-                struct_item.attrs.append(
+                item.attrs.append(
                     &mut syn::Attribute::parse_outer
                         .parse2(quote! {
                             #[nvproc::component]
@@ -199,7 +212,12 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         gen.extend(quote! {
-            #component_types
+            #component_refs;
+
+        });
+        gen.extend(quote! {
+            #component_types;
+
         });
     }
 
@@ -218,26 +236,41 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
     )
     .emit();
     let impl_block = quote! {
+
         impl Components{
             pub fn get<T:crate::ecs::Component>(&self)->&HashMap<IndexType,T>{
 
                 let m:&HashMap<IndexType,T> =unsafe{match T::get_type(){
-                  //#(ecs::components:ComponentType:#names_iter)* =>&self.fields
                   #(ecs::components::ComponentType::#n=>std::mem::transmute(&self.#sn),)*
-                  //ecs::components::ComponentType::Fields=>&self.fields,
                 }
             };
             m
             }
+
             pub fn get_mut<T:crate::ecs::Component>(&mut self)->&mut HashMap<IndexType,T>{
                 let m:&mut HashMap<IndexType,T> =unsafe{match T::get_type(){
-                  //#(ecs::components:ComponentType:#names_iter)* =>&self.fields
                   #(ecs::components::ComponentType::#n=>std::mem::transmute(&mut self.#sn),)*
-                  //ecs::components::ComponentType::Fields=>&self.fields,
                 }
             };
             m
             }
+            pub fn merge(&mut self, other:Self){
+                #(self.#sn.extend(other.#sn.into_iter());)*
+            }
+            pub fn delete_components(&mut self, entity:IndexType){
+                #(self.#sn.remove(&entity);)*
+            }
+            //Returns a new Components object with all the components associated with the given entity
+            pub fn get_components(&self, entity_id:IndexType)->Components{
+                let mut c:Components = Default::default();
+
+                #(
+                   let cl= self.#sn.get(&entity_id).unwrap().clone();
+                    c.#sn.insert(entity_id,cl);)*
+                c
+
+            }
+
         }
     };
 
@@ -245,41 +278,90 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
     input.content.as_mut().unwrap().1.push(
         syn::Item::parse
             .parse2(quote! {
-                #gen
+                #component_types
             })
             .unwrap(),
     );
+    let mut input_stream = input.into_token_stream();
+    input_stream.extend(quote! {
+        use components::*;
+        #component_refs
+    });
 
     let components_struct = quote! {
         #[derive(Default)]
         pub struct Components {
-            #(#sn:HashMap<IndexType,#n>,)*
+            #(pub #sn:HashMap<IndexType,#n>,)*
         }
     };
+    //convert the list of names into a vector of ints from 0 to n
+    let vec_i = n.iter().enumerate().map(|(i, _)| i as u32);
+    let vec_size = vec_i.clone().count();
+    let components_iterator = quote! {
+        impl ecs::components::ComponentType{
+            pub fn from_u32(i:u32)->ecs::components::ComponentType{
+              let comp= match i{
+                     #(#vec_i=>ecs::components::ComponentType::#n,)*
+                     _=>panic!("Invalid component type")
+               };
+               comp
+            }
+                    ///Creates an iterator over all the types of all components
+                    pub fn type_iter()->ComponentIter{
+                        ComponentIter{current_index:0}
+                    }
+        }
 
-    input.content.as_mut().unwrap().1.push(
-        syn::Item::parse
-            .parse2(quote! {
-                #components_struct
-            })
-            .unwrap(),
-    );
+        pub struct ComponentIter{current_index:usize}
+        pub struct ComponentRefIter<'a>{current_index:usize,em:&'a mut EntityManager, entity:IndexType }
 
-    input.content.as_mut().unwrap().1.push(
-        syn::Item::parse
-            .parse2(quote! {
-                #impl_block
-            })
-            .unwrap(),
-    );
+        impl Iterator for ComponentIter{
+            type Item=ecs::components::ComponentType;
+
+            fn next(&mut self)-> Option<Self::Item>{
+                let res =match self.current_index>=#vec_size{
+                    true=>
+                    None,
+                    false=>Some(ecs::components::ComponentType::from_u32(self.current_index as u32))
+
+                };
+                self.current_index+=1;
+                res
+            }
+        }
+        // impl<'a> Iterator for ComponentRefIter<'a>{
+        //     type Item=ecs::ComponentRef<'a>;
+
+        //     fn next(&mut self)->Option<Self::Item>{
+        //         let res=match self.current_index>=#vec_size{
+        //             true=>None,
+        //             false=>{
+        //                 let comp=ecs::components::ComponentType::from_u32(self.current_index as u32);
+        //                 let comp_ref= match comp{
+        //                    #(components::ComponentType:: #n=>{ecs::ComponentRef::<'a>::#n (self.em.get_component_mut::<components:: #n>(self.entity).unwrap())},)*
+        //                 };
+        //                 Some(comp_ref)
+        //             }
+        //         };
+        //         self.current_index+=1;
+        //         res
+
+        //     }
+        // }
+    };
+
+    input_stream.extend(quote! {
+              #components_struct
+              #impl_block
+    });
 
     quote! {
         #[allow(non_camel_case_types)]
         #[allow(dead_code)]
         #[allow(non_snake_case)]
         #[allow(unused_imports)]
-        #input
-
+        #input_stream
+        #components_iterator
     }
     .into()
 }

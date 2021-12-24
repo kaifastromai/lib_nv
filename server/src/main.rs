@@ -32,14 +32,7 @@ impl entity_server::Entity for NvServer {
             Some(entity) => Ok(Response::new(FullEntityResponse {
                 id: entity.id().to_string(),
                 name: entity.entity_class.clone(),
-                signature: entity
-                    .signature
-                    .iter()
-                    .map(|c| {
-                        
-                        *c as i32
-                    })
-                    .collect(),
+                signature: entity.signature.iter().map(|c| *c as i32).collect(),
             })),
             None => Err(Status::new(tonic::Code::NotFound, "Entity not found")),
         }
@@ -55,10 +48,7 @@ impl entity_server::Entity for NvServer {
                 .unwrap()
                 .add_component::<components::Fields>(
                     request.get_ref().entity_id.parse().unwrap(),
-                    FieldsProp {
-                        name: String::from("Name"),
-                        fields: Vec::new(),
-                    },
+                    FieldsProp { fields: Vec::new() },
                 ),
             1 => self
                 .entity_manager
@@ -171,10 +161,7 @@ impl project_server::Project for NvServer {
                 .unwrap()
                 .add_component::<components::Fields>(
                     request.get_ref().entity_id.parse().unwrap(),
-                    FieldsProp {
-                        name: String::from("Name"),
-                        fields: Vec::new(),
-                    },
+                    FieldsProp { fields: Vec::new() },
                 ),
             1 => self
                 .entity_manager

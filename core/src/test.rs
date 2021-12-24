@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use nvproc::component;
 
 use crate::ecs::{
-    components::{self, Name, NameProp},
+    components::{self, Names, NamesProp},
     Component, Entity,
 };
 
@@ -15,12 +15,12 @@ use super::*;
 fn test_add_comp_to_entity() {
     let mut e = Entity::new("CompTest");
     //add component
-    e.add_component::<components::Name>();
+    e.add_component::<components::Names>();
     e.add_component::<components::Fields>();
-    assert!(e.has_component::<components::Name>());
+    assert!(e.has_component::<components::Names>());
     assert!(e.has_component::<components::Fields>());
-    e.remove_component::<components::Name>();
-    assert!(!e.has_component::<components::Name>());
+    e.remove_component::<components::Names>();
+    assert!(!e.has_component::<components::Names>());
     assert!(e.has_component::<components::Fields>());
 }
 
@@ -36,17 +36,16 @@ fn test_add_entity() {
 fn test_add_get_component() {
     let mut entity_manager = EntityManager::new();
     let test_entity = entity_manager.create_entity(String::from("Entity1"));
-    entity_manager.add_component::<components::Name>(
+    entity_manager.add_component::<components::Names>(
         test_entity,
-        NameProp {
-            name: "Bob",
-            aliases: vec!["Robert", "Rob"],
+        NamesProp {
+            name: vec![String::from("Robert"), String::from("Rob")],
         },
     );
     let comp = entity_manager
-        .get_component::<components::Name>(test_entity)
+        .get_component::<components::Names>(test_entity)
         .unwrap();
-    assert_eq!(comp.name, "Bob");
+    assert_eq!(comp.name[0], "Robert");
 }
 #[test]
 fn test_b_tree() {

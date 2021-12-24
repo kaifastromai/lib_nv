@@ -1,3 +1,5 @@
+pub mod prelude;
+
 pub trait StringExt {
     fn to_snake_case(&self) -> String;
 }
