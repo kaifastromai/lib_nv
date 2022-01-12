@@ -3,6 +3,7 @@ tonic::include_proto!("nvproto");
 use nvcore::ecs::components::{FieldsProp, ReferencesProp};
 use nvcore::ecs::{components, EntityManager};
 use nvcore::Project;
+use nvcore::mir::Mir;
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 pub struct NvServer {

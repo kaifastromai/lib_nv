@@ -17,9 +17,12 @@ pub struct Character {
     gender: String,
     bio: String,
     age: String,
+    //Date of birth
     dob: String,
+    //Place of birth
     pob: String,
 }
+
 
 impl Character {
     pub fn new(

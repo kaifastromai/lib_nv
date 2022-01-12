@@ -5,11 +5,10 @@ use uuid::Uuid;
 
 pub type IndexType = u128;
 pub trait Referanceable {
-    fn referance_name(&self) -> String;
-    fn referance_id(&self) -> IndexType;
+    fn get_ref(&self) -> Reference;
 }
-pub mod action;
 pub mod ecs;
+pub mod mir;
 pub mod text_edit;
 use ecs::EntityManager;
 pub trait MapType {
@@ -74,6 +73,14 @@ impl std::hash::Hash for Progression {
         self.id.hash(state);
     }
 }
+impl Referanceable for Progression {
+    fn get_ref(&self) -> Reference {
+        Reference {
+            id: self.id,
+            display_name: self.name.clone(),
+        }
+    }
+}
 
 pub struct Manuscript {
     id: IndexType,
@@ -125,6 +132,14 @@ impl Manuscript {
         sorted
     }
 }
+impl Referanceable for Manuscript {
+    fn get_ref(&self) -> Reference {
+        Reference {
+            id: self.id,
+            display_name: self.name.clone(),
+        }
+    }
+}
 
 //impl PartialEq and Hash for Manuscript based on entity id
 impl PartialEq for Manuscript {
@@ -144,7 +159,6 @@ pub struct Project {
     pub name: String,
     pub description: String,
     pub manuscripts: HashMap<IndexType, Manuscript>,
-    pub entity_manager: EntityManager,
 }
 impl Project {
     pub fn new(name: &str, description: &str) -> Self {
@@ -153,7 +167,6 @@ impl Project {
             name: String::from(name),
             description: String::from(description),
             manuscripts: HashMap::new(),
-            entity_manager: EntityManager::new(),
         }
     }
     pub fn new_empty() -> Self {
@@ -162,7 +175,6 @@ impl Project {
             name: String::new(),
             description: String::new(),
             manuscripts: HashMap::new(),
-            entity_manager: EntityManager::new(),
         }
     }
     pub fn add_manuscript(&mut self, manuscript: Manuscript) {
@@ -191,25 +203,16 @@ impl Project {
                 })
             }
         }
-
-        //add all entity references
-        for entity in self.entity_manager.get_all_entities() {
-            references.push(Reference {
-                display_name: entity.entity_class.clone(),
-                id: entity.id(),
-            })
-        }
         //add all manuscript references
         for manuscript in self.get_all_manuscripts() {
-            references.push(Reference {
-                display_name: manuscript.name.clone(),
-                id: manuscript.id,
-            })
+            references.push(manuscript.get_ref());
         }
 
         references
     }
 }
+
+//A reference to any object that implements Referenceable
 pub struct Reference {
     pub display_name: String,
     pub id: IndexType,

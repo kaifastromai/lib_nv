@@ -108,71 +108,6 @@ pub struct Image {
 pub struct BinaryDatum {
     data: Vec<u8>,
 }
-impl<'a> Iterator for ComponentRefIter<'a> {
-    type Item = ecs::ComponentRef<'a>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let res = match self.current_index >= 9usize {
-            true => None,
-            false => {
-                let comp = ecs::components::ComponentType::from_u32(self.current_index as u32);
-                let comp_ref = match comp {
-                    components::ComponentType::Fields => ecs::ComponentRef::<'a>::Fields(
-                        self.em
-                            .get_component_mut::<components::Fields>(self.entity)
-                            .unwrap(),
-                    ),
-                    components::ComponentType::FamilyRelationship => {
-                        ecs::ComponentRef::<'a>::FamilyRelationship(
-                            self.em
-                                .get_component_mut::<components::FamilyRelationship>(self.entity)
-                                .unwrap(),
-                        )
-                    }
-                    components::ComponentType::CustomRelationship => {
-                        ecs::ComponentRef::<'a>::CustomRelationship(
-                            self.em
-                                .get_component_mut::<components::CustomRelationship>(self.entity)
-                                .unwrap(),
-                        )
-                    }
-                    components::ComponentType::Videos => ecs::ComponentRef::<'a>::Videos(
-                        self.em
-                            .get_component_mut::<components::Videos>(self.entity)
-                            .unwrap(),
-                    ),
-                    components::ComponentType::Audios => ecs::ComponentRef::<'a>::Audios(
-                        self.em
-                            .get_component_mut::<components::Audios>(self.entity)
-                            .unwrap(),
-                    ),
-                    components::ComponentType::Names => ecs::ComponentRef::<'a>::Names(
-                        self.em
-                            .get_component_mut::<components::Names>(self.entity)
-                            .unwrap(),
-                    ),
-                    components::ComponentType::BinaryData => ecs::ComponentRef::<'a>::BinaryData(
-                        self.em
-                            .get_component_mut::<components::BinaryData>(self.entity)
-                            .unwrap(),
-                    ),
-                    components::ComponentType::Images => ecs::ComponentRef::<'a>::Images(
-                        self.em
-                            .get_component_mut::<components::Images>(self.entity)
-                            .unwrap(),
-                    ),
-                    components::ComponentType::References => ecs::ComponentRef::<'a>::References(
-                        self.em
-                            .get_component_mut::<components::References>(self.entity)
-                            .unwrap(),
-                    ),
-                };
-                Some(comp_ref)
-            }
-        };
-        self.current_index += 1;
-        res
-    }
-}
 
 #[gen_components]
 pub mod components {
@@ -193,7 +128,7 @@ pub mod components {
         fn remove_field(&mut self, name: &'static str) {
             self.fields.retain(|field| field.name != name);
         }
-        fn get_fields(&self) -> &Vec<Field> {
+        pub fn get_fields(&self) -> &Vec<Field> {
             &self.fields
         }
     }
@@ -311,7 +246,7 @@ pub struct EntityGraph {
     pub entities: Vec<Entity>,
     pub components: Components,
 }
-
+#[derive(Clone)]
 pub struct EntityManager {
     entities: HashMap<IndexType, Entity>,
     components: Components,
@@ -329,10 +264,9 @@ impl EntityManager {
         entity.id()
     }
     pub fn delete_entity(&mut self, entity_id: IndexType) {
+        self.strip_entity(entity_id);
         match self.entities.remove(&entity_id) {
-            Some(entity) => {
-                self.delete_components(entity.id());
-            }
+            Some(entity) => {}
             None => {
                 println!("Entity with id {} does not exist", entity_id);
             }
@@ -349,18 +283,61 @@ impl EntityManager {
     }
     pub fn get_component<T: Component>(&self, entity: IndexType) -> Option<&T> {
         let c = self.components.get::<T>();
-        c.get(&entity)
+        let ret = c.get(&entity);
+        match ret {
+            Some(comp) => {
+                if comp.get_is_deleted() {
+                    None
+                } else {
+                    Some(comp)
+                }
+            }
+            None => None,
+        }
     }
-    pub fn get_component_mut<T: Component>(&mut self, entity: IndexType) -> Option<&mut T> {
-        let c = self.components.get_mut::<T>();
-        c.get_mut(&entity)
+    pub fn get_component_mut<'a, T: Component>(
+        &'a mut self,
+        entity: IndexType,
+    ) -> Option<&'a mut T> {
+        let c = self.components.get_mut::<'a, T>();
+        let ret = c.get_mut(&entity);
+        match ret {
+            Some(comp) => {
+                if comp.get_is_deleted() {
+                    None
+                } else {
+                    Some(comp)
+                }
+            }
+            None => None,
+        }
     }
 
     pub fn get_entity(&self, entity_index: IndexType) -> Option<&Entity> {
-        self.entities.get(&entity_index)
+        let e = self.entities.get(&entity_index);
+        match e {
+            Some(entity) => {
+                if entity.is_marked_for_deletion() {
+                    None
+                } else {
+                    Some(entity)
+                }
+            }
+            None => None,
+        }
     }
     pub fn get_entity_mut(&mut self, entity_index: IndexType) -> Option<&mut Entity> {
-        self.entities.get_mut(&entity_index)
+        let e = self.entities.get_mut(&entity_index);
+        match e {
+            Some(entity) => {
+                if entity.is_marked_for_deletion() {
+                    None
+                } else {
+                    Some(entity)
+                }
+            }
+            None => None,
+        }
     }
     pub fn get_entities_by_class(&self, entity_class: &str) -> Vec<&Entity> {
         self.entities
@@ -374,8 +351,13 @@ impl EntityManager {
             .filter(|entity| entity.entity_class == entity_class)
             .collect::<Vec<_>>()
     }
+    //Gets all currently living entities
     pub fn get_all_entities(&self) -> Vec<&Entity> {
-        self.entities.values().collect::<Vec<_>>()
+        //Iterate and only return entities that are not marked for deletion
+        self.entities
+            .values()
+            .filter(|entity| !entity.is_marked_for_deletion())
+            .collect()
     }
     pub fn add_from_entity_graph(&mut self, entity_graph: EntityGraph) {
         for entity in entity_graph.entities.iter() {
@@ -388,22 +370,37 @@ impl EntityManager {
         let s2 = s.clone();
         self.components.merge(components);
     }
-    pub fn delete_components(&mut self, entity: IndexType) {
-        let entity_ref = self.entities.get_mut(&entity).unwrap();
+    ///Removes all components from the entity
+    pub fn strip_entity(&mut self, entity: IndexType) {
+        let entity_ref = self
+            .entities
+            .get_mut(&entity)
+            .expect("Entity does not exist");
         entity_ref.signature.clear();
         self.components.delete_components(entity);
     }
-    //ReComponents object with all components of the given entity
+    //Returns a new Components object with all components of the given entity
     pub fn get_components(&self, entity: IndexType) -> Components {
         self.components.get_components(entity)
     }
     pub fn mark_entity_for_deletion(&mut self, entity: IndexType) {
         let entity_ref = self.entities.get_mut(&entity).unwrap();
         entity_ref.mark_for_deletion();
+        //mark all components of the entity for deletion
+        entity_ref.mark_for_deletion();
+        self.components.set_mark_for_deletion(entity, true);
     }
     pub fn unmark_entity_for_deletion(&mut self, entity: IndexType) {
         let entity_ref = self.entities.get_mut(&entity).unwrap();
         entity_ref.unmark_for_deletion();
+        self.components.set_mark_for_deletion(entity, false);
+    }
+    pub fn get_components_ref<'a>(
+        &'a self,
+        entity_id: IndexType,
+    ) -> Result<Vec<ComponentRef<'a>>, &'static str> {
+        let res = self.components.get_components_ref(entity_id)?;
+        Ok(res)
     }
 }
 

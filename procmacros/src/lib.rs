@@ -247,7 +247,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
             m
             }
 
-            pub fn get_mut<T:crate::ecs::Component>(&mut self)->&mut HashMap<IndexType,T>{
+            pub fn get_mut<'a, T:crate::ecs::Component>(&'a mut self)->&'a mut HashMap<IndexType,T>{
                 let m:&mut HashMap<IndexType,T> =unsafe{match T::get_type(){
                   #(ecs::components::ComponentType::#n=>std::mem::transmute(&mut self.#sn),)*
                 }
@@ -260,15 +260,46 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
             pub fn delete_components(&mut self, entity:IndexType){
                 #(self.#sn.remove(&entity);)*
             }
+            pub fn set_mark_for_deletion(&mut self, entity:IndexType, is_deleted:bool){
+                #(
+
+                    match self.#sn.get_mut(&entity){
+                        Some(c)=>{
+                            c.set_is_deleted(is_deleted);
+                        },
+                        None=>()
+
+                    };
+
+
+            )*
+            }
             //Returns a new Components object with all the components associated with the given entity
             pub fn get_components(&self, entity_id:IndexType)->Components{
                 let mut c:Components = Default::default();
 
                 #(
-                   let cl= self.#sn.get(&entity_id).unwrap().clone();
-                    c.#sn.insert(entity_id,cl);)*
+                  match self.#sn.get(&entity_id){
+                    Some(comp)=>   {c.#sn.insert(entity_id,comp.clone());},
+                    None=>{}
+                  }
+                )*
                 c
 
+            }
+            pub fn get_components_ref<'a>(&'a self, entity_id:IndexType)->Result<Vec< ComponentRef<'a>>, &'static str>{
+                let mut c:Vec<ComponentRef<'a>> = Vec::new();
+                #(
+                   match self.#sn.get(&entity_id){
+                       Some(cl)=>{
+                    c.push(ComponentRef::<'a>::#n(cl));}
+                None=>()
+                };
+                )*
+                if(c.is_empty()){
+                    return Err("No components found for the given entity")
+                }
+                Ok(c)
             }
 
         }
@@ -289,9 +320,9 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
     });
 
     let components_struct = quote! {
-        #[derive(Default)]
+        #[derive(Default, Clone)]
         pub struct Components {
-            #(pub #sn:HashMap<IndexType,#n>,)*
+            #(pub #sn:HashMap<IndexType,components:: #n>,)*
         }
     };
     //convert the list of names into a vector of ints from 0 to n
@@ -313,7 +344,6 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         pub struct ComponentIter{current_index:usize}
-        pub struct ComponentRefIter<'a>{current_index:usize,em:&'a mut EntityManager, entity:IndexType }
 
         impl Iterator for ComponentIter{
             type Item=ecs::components::ComponentType;
@@ -329,25 +359,7 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
                 res
             }
         }
-        // impl<'a> Iterator for ComponentRefIter<'a>{
-        //     type Item=ecs::ComponentRef<'a>;
 
-        //     fn next(&mut self)->Option<Self::Item>{
-        //         let res=match self.current_index>=#vec_size{
-        //             true=>None,
-        //             false=>{
-        //                 let comp=ecs::components::ComponentType::from_u32(self.current_index as u32);
-        //                 let comp_ref= match comp{
-        //                    #(components::ComponentType:: #n=>{ecs::ComponentRef::<'a>::#n (self.em.get_component_mut::<components:: #n>(self.entity).unwrap())},)*
-        //                 };
-        //                 Some(comp_ref)
-        //             }
-        //         };
-        //         self.current_index+=1;
-        //         res
-
-        //     }
-        // }
     };
 
     input_stream.extend(quote! {
