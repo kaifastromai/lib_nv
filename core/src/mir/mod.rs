@@ -27,7 +27,7 @@ impl<'a> Mir<'a> {
     //Starts mir service. Mir will start listening for events from the client, and consume them.
     pub fn exec(&mut self) {
         while let Some(event) = self.event_queue.events.pop_front() {
-            event.exec( self);
+            event.exec(self);
         }
     }
     //Mir must expose all public functions of EntityManager and Project
@@ -103,14 +103,22 @@ impl<'a> Mir<'a> {
 // An event is different from an action in that an event is not undoable and comes directly from the client.
 //Mir takes an event, converts it to an action if appropriate, and then executes the action.
 //A single event can be translated to multiple actions.
+
+pub trait Returnable {}
 pub trait Event {
-    fn exec(&self, mir: &mut Mir)->dyn std::any::Any;
+    fn exec(&self, mir: &mut Mir);
 }
 pub struct EventQueue {
     pub events: VecDeque<Box<dyn Event>>,
+    
 }
 impl EventQueue {
     fn new() -> Self {
-        Self { events: VecDeque::new() }
+        Self {
+            events: VecDeque::new(),
+        }
     }
+    fn add_event(&mut self, event:impl Event + 'static) {
+        self.events.push_back(Box::new(event));
+    }   
 }
