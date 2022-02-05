@@ -7,8 +7,8 @@ use action::{Action, ActionStack};
 
 ///Mir is the interface by which to communicate with internal kernel. It is the only way to interact with the kernel.
 //It is a "mirror" of all actions that can be performed from outside the kernel.
-///The exec method of an event takes a reference to the mir, and mir is responsible for executing the event.
-/// Mir owns all data in the kernel, and is responsible for updating the kernel.
+///The exec method of an event takes a reference to the mir, and mir is responsible for execution.
+/// Mir owns all data in the kernel;
 pub struct Mir<'a> {
     pub em: EntityManager,
     pub proj: Project,
@@ -23,6 +23,9 @@ impl<'a> Mir<'a> {
             event_queue: EventQueue::new(),
             action_stack: ActionStack::new(20),
         }
+    }
+    pub fn say_hello(&self) {
+        println!("Hello from Mir");
     }
 }
 

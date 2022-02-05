@@ -1,23 +1,25 @@
 tonic::include_proto!("nvproto");
 
-use nvcore::ecs::components::{FieldsProp, ReferencesProp};
-use nvcore::ecs::{components, EntityManager};
-use nvcore::Project;
 use nvcore::mir::Mir;
+use nvcore::Project;
 use std::sync::Mutex;
+use tokio::sync::RwLock;
 use tonic::{transport::Server, Request, Response, Status};
+type Action = (fn(&mut Mir), i32);
 pub struct NvServer {
-    entity_manager: Mutex<EntityManager>,
-    project: Mutex<Option<Project>>,
+    queue: RwLock<Vec<Action>>,
 }
 
 impl NvServer {
     fn new() -> NvServer {
         NvServer {
-            entity_manager: Mutex::new(EntityManager::new()),
-            project: Mutex::new(None),
+            queue: RwLock::new(Vec::new()),
         }
     }
+}
+
+fn test_action(mir: &mut Mir) {
+    mir.say_hello();
 }
 
 #[tonic::async_trait]
@@ -26,55 +28,25 @@ impl entity_server::Entity for NvServer {
         &self,
         request: Request<EntityRequest>,
     ) -> Result<Response<FullEntityResponse>, Status> {
-        let entity_id = request.into_inner().id;
-        let entity_manager = self.entity_manager.lock().unwrap();
-        let entity = entity_manager.get_entity(entity_id.parse().unwrap());
-        match entity {
-            Some(entity) => Ok(Response::new(FullEntityResponse {
-                id: entity.id().to_string(),
-                name: entity.entity_class.clone(),
-                signature: entity.signature.iter().map(|c| *c as i32).collect(),
-            })),
-            None => Err(Status::new(tonic::Code::NotFound, "Entity not found")),
-        }
+        //get write lock
+        let mut queue = self.queue.write().await;
+        queue.push((test_action, 1));
+        Err(Status::already_exists("already exists"))
     }
     async fn add_component(
         &self,
         request: Request<ComponentRequest>,
     ) -> Result<Response<EntityResponse>, Status> {
-        match request.get_ref().component_type {
-            0 => self
-                .entity_manager
-                .lock()
-                .unwrap()
-                .add_component::<components::Fields>(
-                    request.get_ref().entity_id.parse().unwrap(),
-                    FieldsProp { fields: Vec::new() },
-                ),
-            1 => self
-                .entity_manager
-                .lock()
-                .unwrap()
-                .add_component::<components::References>(
-                    request.get_ref().entity_id.parse().unwrap(),
-                    ReferencesProp {
-                        entity_references: Vec::new(),
-                    },
-                ),
-            _ => {}
-        };
-        Ok(Response::new(EntityResponse {
-            id: request.get_ref().clone().entity_id,
-        }))
+        todo!()
     }
     async fn remove_component(
         &self,
         request: Request<RemoveComponentRequest>,
     ) -> Result<Response<EntityResponse>, Status> {
-        unimplemented!()
+        todo!()
     }
     async fn add_entity(&self, request: Request<Name>) -> Result<Response<EntityResponse>, Status> {
-        unimplemented!()
+        todo!()
     }
 }
 
@@ -84,101 +56,25 @@ impl project_server::Project for NvServer {
         &self,
         request: Request<project_message::Create>,
     ) -> Result<Response<EntityResponse>, Status> {
-        let project_params = request.into_inner();
-        let mut p = self.project.lock().unwrap();
-        //get id of project or create new one
-        let id = match p.as_ref() {
-            Some(_) => {
-                println!("project already exists");
-                return Err(Status::new(
-                    tonic::Code::AlreadyExists,
-                    "project already exists".to_string(),
-                ));
-            }
-            None => {
-                println!("creating new project");
-
-                let project = Project::new(
-                    project_params.name.as_str(),
-                    project_params.description.as_str(),
-                );
-                p.replace(project);
-
-                let nid = p.as_ref().unwrap().id;
-                println!("created new project with id: {}", nid);
-                nid
-            }
-        };
-
-        let res = EntityResponse { id: id.to_string() };
-
-        Ok(Response::new(res))
+        todo!()
     }
     async fn get_project(
         &self,
         request: Request<project_message::Get>,
     ) -> Result<Response<project_message::Response>, Status> {
-        let p = self.project.lock().unwrap();
-        let p = p.as_ref();
-        match p {
-            Some(p) => {
-                let project_response = project_message::Response {
-                    id: p.id.to_string(),
-                    name: p.name.clone(),
-                    description: p.description.clone(),
-                };
-                Ok(Response::new(project_response))
-            }
-            None => Err(Status::new(
-                tonic::Code::NotFound,
-                "No project has been loaded!",
-            )),
-        }
+        todo!()
     }
     async fn get_entity(
         &self,
         request: Request<EntityRequest>,
     ) -> Result<Response<FullEntityResponse>, Status> {
-        let entity_id = request.into_inner().id;
-        let entity_manager = self.entity_manager.lock().unwrap();
-        let entity = entity_manager.get_entity(entity_id.parse().unwrap());
-        match entity {
-            Some(entity) => Ok(Response::new(FullEntityResponse {
-                id: entity.id().to_string(),
-                name: entity.entity_class.clone(),
-                signature: entity.signature.iter().map(|c| *c as i32).collect(),
-            })),
-            None => Err(Status::new(tonic::Code::NotFound, "Entity not found")),
-        }
+        todo!()
     }
     async fn add_component(
         &self,
         request: Request<ComponentRequest>,
     ) -> Result<Response<EntityResponse>, Status> {
-        match request.get_ref().component_type {
-            0 => self
-                .entity_manager
-                .lock()
-                .unwrap()
-                .add_component::<components::Fields>(
-                    request.get_ref().entity_id.parse().unwrap(),
-                    FieldsProp { fields: Vec::new() },
-                ),
-            1 => self
-                .entity_manager
-                .lock()
-                .unwrap()
-                .add_component::<components::References>(
-                    request.get_ref().entity_id.parse().unwrap(),
-                    ReferencesProp {
-                        entity_references: Vec::new(),
-                    },
-                ),
-            _ => {}
-        };
-        Ok(Response::new(EntityResponse {
-            id: request.get_ref().clone().entity_id,
-        }))
+        todo!()
     }
     async fn remove_component(
         &self,
@@ -187,12 +83,7 @@ impl project_server::Project for NvServer {
         unimplemented!()
     }
     async fn add_entity(&self, request: Request<Name>) -> Result<Response<EntityResponse>, Status> {
-        let mut em = self.entity_manager.lock().unwrap();
-        let entity_ref = em.create_entity(request.into_inner().name);
-        println!("Created entity with id: {}", entity_ref);
-        Ok(Response::new(EntityResponse {
-            id: entity_ref.to_string(),
-        }))
+        todo!()
     }
 }
 #[tokio::main]
@@ -200,8 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
     let service = NvServer::new();
     Server::builder()
-        .add_service(project_server::ProjectServer::new(service))
+        .add_service(entity_server::EntityServer::new(service))
         .serve(addr)
         .await?;
+        
     Ok(())
 }
