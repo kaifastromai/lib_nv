@@ -1,6 +1,6 @@
 # Novella
-The Novella IDE for creative writing and development. 
+This is the core novella library, that contained almost exclusively rust code. 
 
-This is the core novella server (the kernel). Written in Rust. UI clients can communicate with its gRPC powered API. A simple client written in Qt is being developed as well.
+This exposes an api for interaction from possibly various languages. This is marks significant change in the architecture of the program, hopefully for the better.
 ## Warning!
 This project is in extremely early stages, and is mostly a learning experience for the author. 
