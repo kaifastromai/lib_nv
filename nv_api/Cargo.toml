@@ -1,0 +1,14 @@
+[package]
+name = "nv_api"
+version = "0.1.0"
+authors = [""]
+description = "The public api for novella. Used to expose functions to the frontend."
+edition = "2021"
+
+[lib]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nvcore = { path = "../core" }
+[build-dependencies]
+tonic-build = "0.6"

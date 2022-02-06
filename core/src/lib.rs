@@ -8,8 +8,6 @@ pub trait Referanceable {
     fn get_ref(&self) -> Reference;
 }
 pub mod ecs;
-pub mod mir;
-pub mod text_edit;
 use ecs::EntityManager;
 pub trait MapType {
     fn get_map(&self) -> &dyn MapType;

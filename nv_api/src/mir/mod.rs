@@ -1,27 +1,24 @@
-mod action;
 use std::collections::VecDeque;
 
-use crate::ecs::EntityManager;
-use crate::{IndexType, Manuscript, Project};
-use action::{Action, ActionStack};
+use nvcore::ecs::EntityManager;
+use nvcore::Project;
 
-///Mir is the interface by which to communicate with internal kernel. It is the only way to interact with the kernel.
-//It is a "mirror" of all actions that can be performed from outside the kernel.
-///The exec method of an event takes a reference to the mir, and mir is responsible for execution.
-/// Mir owns all data in the kernel;
-pub struct Mir<'a> {
-    pub em: EntityManager,
-    pub proj: Project,
-    pub event_queue: EventQueue,
-    pub action_stack: ActionStack<'a>,
+#[repr(C)]
+pub struct Action(pub fn(*mut Mir));
+
+pub struct Mir {
+    em: EntityManager,
+    proj: Project,
+    event_queue: EventQueue,
+    action_queue: VecDeque<Action>,
 }
-impl<'a> Mir<'a> {
-    fn new() -> Mir<'a> {
+impl Mir {
+    pub fn new() -> Self {
         Mir {
             em: EntityManager::new(),
             proj: Project::new_empty(),
             event_queue: EventQueue::new(),
-            action_stack: ActionStack::new(20),
+            action_queue: VecDeque::new(),
         }
     }
     pub fn say_hello(&self) {
