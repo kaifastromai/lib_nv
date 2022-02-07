@@ -1,3 +1,2 @@
 [workspace]
-members = ["core", "server", "procmacros", "utils", "csl"]
-
+members = ["core", "utils", "csl", "nv_api"]
