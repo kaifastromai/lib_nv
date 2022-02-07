@@ -1,5 +1,8 @@
 {
     "lldb.showDisassembly": "never",
     "lldb.dereferencePointers": true,
-    "lldb.displayFormat": "auto"
+    "lldb.displayFormat": "auto",
+    "files.associations": {
+        "new": "cpp"
+    }
 }
