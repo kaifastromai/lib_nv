@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 use nvcore::ecs::EntityManager;
 use nvcore::Project;
 
-#[repr(C)]
 pub struct Action(pub fn(*mut Mir));
 
 pub struct Mir {
@@ -13,8 +12,7 @@ pub struct Mir {
     action_queue: VecDeque<Action>,
 }
 impl Mir {
-    #[no_mangle]
-    pub extern "C" fn create() -> Self {
+    pub fn new() -> Self {
         Mir {
             em: EntityManager::new(),
             proj: Project::new_empty(),

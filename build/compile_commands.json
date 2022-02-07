@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/jstrom/dev/lib_nv/build",
+  "command": "/home/linuxbrew/.linuxbrew/bin/clang++   -g -o CMakeFiles/lib_nv.dir/lib_nv.cpp.o -c /home/jstrom/dev/lib_nv/lib_nv.cpp",
+  "file": "/home/jstrom/dev/lib_nv/lib_nv.cpp"
+}
+]

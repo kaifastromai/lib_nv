@@ -1,0 +1,4 @@
+/home/jstrom/dev/lib_nv/build/CMakeFiles/package.dir
+/home/jstrom/dev/lib_nv/build/CMakeFiles/package_source.dir
+/home/jstrom/dev/lib_nv/build/CMakeFiles/edit_cache.dir
+/home/jstrom/dev/lib_nv/build/CMakeFiles/rebuild_cache.dir

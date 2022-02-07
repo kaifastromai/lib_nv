@@ -10,5 +10,6 @@ edition = "2021"
 
 [dependencies]
 nvcore = { path = "../core" }
+
 [build-dependencies]
-tonic-build = "0.6"
+cbindgen = "0.20.0"
