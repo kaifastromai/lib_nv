@@ -1,2 +1,0 @@
-/home/linuxbrew/.linuxbrew/bin/llvm-ar qc liblib_nv.a CMakeFiles/lib_nv.dir/lib_nv.cpp.o
-/home/linuxbrew/.linuxbrew/bin/llvm-ranlib liblib_nv.a
