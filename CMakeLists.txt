@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.20.0)
 project(lib_nv VERSION 0.1.0)
-
 include(CTest)
 enable_testing()
-include(rust_interop.cmake)
-build_rust(nv ${CMAKE_SOURCE_DIR}, ${CMAKE_BUILD_TYPE})
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+enable_language(Rust)
+include(CMakeCargo)
+cargo_build(NAME nv-lib)
+
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_SOURCE_DIR}/c_api/include/)
 
