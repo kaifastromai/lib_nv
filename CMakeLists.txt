@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.20.0)
-project(lib_nv VERSION 0.1.0)
+project(nv_api VERSION 0.1.0)
 include(CTest)
 enable_testing()
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 enable_language(Rust)
 include(CMakeCargo)
-cargo_build(NAME nv-lib)
-
-add_library(${PROJECT_NAME} INTERFACE)
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_SOURCE_DIR}/c_api/include/)
+cargo_build(NAME nv_api)
+target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/c_api/include/)
+#link with pthread 
+target_link_libraries(${PROJECT_NAME} INTERFACE pthread dl)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
