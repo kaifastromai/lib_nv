@@ -1,6 +1,4 @@
-use mir::Mir;
-
-pub mod mir;
+use nvcore::mir::Mir;
 
 #[repr(C)]
 //Context holds the current state of the kernel. It must be exposed to the C API.
@@ -21,12 +19,6 @@ impl Context {
     pub extern "C" fn destroy(ctx: &mut Self) {
         unsafe {
             Box::from_raw(ctx.mir);
-        }
-    }
-    #[no_mangle]
-    pub extern "C" fn say_hello(&self) {
-        unsafe {
-            (*self.mir).say_hello();
         }
     }
 }

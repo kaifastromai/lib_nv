@@ -1,4 +1,4 @@
-mod archetypes;
+pub mod archetypes;
 pub mod prelude;
 use bevy_ecs::prelude::*;
 
@@ -6,6 +6,7 @@ use super::*;
 pub use serde::{Deserialize, Serialize};
 use utils::prelude::*;
 
+pub extern crate bevy_ecs;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Component)]
 pub struct NVEntity {
     pub class: String,
@@ -51,6 +52,9 @@ impl EntityManager {
     pub fn add_entity(&mut self, class: String) -> Entity {
         self.world.spawn().insert(NVEntity { class }).id()
     }
+    pub fn remove_entity(&mut self, entity: Entity) {
+        self.world.get_entity_mut(entity).unwrap().despawn();
+    }
     pub fn add_component<T: bevy_ecs::component::Component>(
         &mut self,
         entity: Entity,
@@ -66,6 +70,12 @@ impl EntityManager {
     }
     pub fn add_archetype<T: archetypes::Archetype>(&mut self, entity: Entity, archetype: T) {
         archetype.generate(&mut self.world);
+    }
+    pub fn get_entity(&self, entity: Entity) -> Option<bevy_ecs::world::EntityRef> {
+        self.world.get_entity(entity)
+    }
+    pub fn get_entity_mut(&mut self, entity: Entity) -> Option<bevy_ecs::world::EntityMut> {
+        self.world.get_entity_mut(entity)
     }
 }
 

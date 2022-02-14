@@ -8,6 +8,8 @@ pub trait Referanceable {
     fn get_ref(&self) -> Reference;
 }
 pub mod ecs;
+mod action;
+pub mod mir;
 use ecs::EntityManager;
 pub trait MapType {
     fn get_map(&self) -> &dyn MapType;
@@ -79,6 +81,8 @@ impl Referanceable for Progression {
         }
     }
 }
+
+//A manuscript contains a collection of progressions.
 
 pub struct Manuscript {
     id: IndexType,
@@ -204,6 +208,7 @@ impl Project {
         //add all manuscript references
         for manuscript in self.get_all_manuscripts() {
             references.push(manuscript.get_ref());
+          
         }
 
         references

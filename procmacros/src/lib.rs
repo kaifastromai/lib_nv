@@ -8,6 +8,71 @@ use syn::{
 };
 use utils::StringExt;
 
+#[proc_macro_derive(Resource)]
+pub fn resoure_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    //it is an error of the type has generic parameters
+    if !input.generics.params.is_empty() {
+        Diagnostic::new(Level::Error, "Resource can not have generic parameters").emit();
+    }
+    //call the structs new function
+    let struct_impl = quote! {
+        impl Resource for #name{
+            fn get_resource(&mut self)->&mut dyn Resource{
+                self
+            }
+        }
+    };
+
+    struct_impl.into()
+}
+//Generates implementation of actionfn for any function
+// #[proc_macro_attribute]
+// pub fn action_fn_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
+//     let item = parse_macro_input!(item as syn::ItemFn);
+//     let attr = parse_macro_input!(attr as syn::AttributeArgs);
+
+//     //get function arguments
+//     let mut args = item.sig.inputs.iter();
+//     //if it has more than one argument, it is an error
+//     if args.len() != 1 {
+//         Diagnostic::new(Level::Error, "ActionFn can only have one argument").emit();
+//     }
+//     let arg = args.next();
+//     let arg;
+//     let arg_impl = match arg {
+//         Some(arg) => {
+//             quote! {
+//                 impl Resource for #arg{
+//                     fn get_resource(&mut self)->&mut dyn Resource{
+//                         self
+//                     }
+//                 }
+//             }
+//         }
+//         None => {
+//             quote! {
+//               impl Resource for (){
+//                    fn get_resource(&mut self)->&mut dyn Resource{
+//                         self
+//                    }
+//               }
+//             }
+//         }
+//     };
+//     let into_action_fn = quote! {
+//         impl IntoActionFn for #item{
+//             fn into_action_fn(self)->dyn ActionFn{
+//                 ActionFn{
+
+//                 }
+//             }
+//         }
+//     };
+
+// }
+
 #[proc_macro_derive(Component)]
 pub fn component_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
