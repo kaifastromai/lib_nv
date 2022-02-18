@@ -3,32 +3,55 @@
 //! a method of possibly undoing said change
 
 #![feature(associated_type_bounds)]
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use crate::mir::Mir;
 
 pub trait ResrcTy {
-    fn get_resource(&mut self) -> &mut dyn ResrcTy;
+    fn get_resource(&mut self) -> &mut dyn Any;
 }
 #[derive(Debug)]
 pub struct TestRsrc {
     pub name: String,
 }
 impl ResrcTy for TestRsrc {
-    fn get_resource(&mut self) -> &mut dyn ResrcTy {
+    fn get_resource(&mut self) -> &mut dyn Any {
         self
     }
 }
-pub struct Resrc<T: ResrcTy>(std::marker::PhantomData<T>);
-
-impl<T: ResrcTy> From<Resrc<T>> for T {
-    fn from(_: Resrc<T>) -> Self {
-        todo!()
+impl ResrcTy for () {
+    fn get_resource(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
-pub fn test_fn(name: Resrc<TestRsrc>) {
-    println!("{:?}", name);
+pub struct Resrc<T: ResrcTy + Sized>(T);
+impl<T: ResrcTy> Resrc<T> {
+    pub fn into_type(self) -> T {
+        self.0
+    }
+}
+
+pub fn test_fn(mir: &mut Mir) -> Box<dyn ResrcTy> {
+    let name = "test";
+    let mut rsrc = TestRsrc {
+        name: name.to_string(),
+    };
+    Box::new(rsrc)
+}
+impl ResrcTy for &dyn ResrcTy {
+    fn get_resource(&mut self) -> &mut dyn Any {
+        self.get_resource()
+    }
+}
+pub fn undo_test_fn(mut rsrc: Resrc<&dyn ResrcTy>) {
+    let mut rsrc: &TestRsrc = rsrc
+        .0
+        .get_resource()
+        .downcast_ref::<TestRsrc>()
+        .unwrap()
+        .clone();
+    println!("undo_test_fn: {}", rsrc.name);
 }
 //Converts a normal function into an action
 pub trait IntoActionFn {
@@ -43,13 +66,8 @@ pub struct AddEntityResource {
 }
 
 impl ResrcTy for AddEntityResource {
-    fn get_resource(&mut self) -> &mut dyn ResrcTy {
+    fn get_resource(&mut self) -> &mut dyn Any {
         self
-    }
-    fn create_resource(&mut self) -> Box<dyn ResrcTy> {
-        Box::new(AddEntityResource {
-            entity: crate::ecs::bevy_ecs::entity::Entity::from_raw(0),
-        })
     }
 }
 pub fn action_add_entity(mir: &mut Mir, rsrc: &mut AddEntityResource) -> bool {
@@ -60,13 +78,23 @@ pub fn action_add_entity(mir: &mut Mir, rsrc: &mut AddEntityResource) -> bool {
 pub fn undo_add_entity(mir: &mut Mir, rsrc: &mut AddEntityResource) {
     mir.em.remove_entity(rsrc.entity);
 }
+
 pub struct Action<'a> {
     pub resource_id: u128,
-    pub func: &'a dyn ActionFn,
+    pub exec: &'a dyn Fn(&mut Mir) -> Box<dyn ResrcTy>,
+    pub undo: &'a dyn Fn(Resrc<&dyn ResrcTy>),
 }
 impl<'a> Action<'a> {
-    pub fn new(resource_id: u128, func: &'a impl ActionFn) -> Self {
-        Action { resource_id, func }
+    pub fn new(
+        resource_id: u128,
+        exec: &'a impl Fn(&mut Mir) -> Box<dyn ResrcTy>,
+        undo: &'a impl Fn(Resrc<&dyn ResrcTy>),
+    ) -> Self {
+        Action {
+            resource_id,
+            exec,
+            undo: undo,
+        }
     }
 }
 

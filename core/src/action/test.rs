@@ -7,7 +7,7 @@ fn test_register_action() {
         print!("Hello");
         return true;
     };
-    let action = Action::new(0, &action_add_entity);
+    let action = Action::new(0, &test_fn, &undo_test_fn);
 
     let mut act=Actman::new(&mut mir);
     act.register_action(action)
