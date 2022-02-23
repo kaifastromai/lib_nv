@@ -20,3 +20,5 @@ utils = { version = "0.1.0", path = "../utils" }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 bevy_ecs = "0.6.1"
+dyn-clone = "1.0.4"
+anyhow = "1.0.54"
