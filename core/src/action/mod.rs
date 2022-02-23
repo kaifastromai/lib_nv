@@ -16,17 +16,8 @@ macro_rules! action {
         }
     };
 }
-pub struct ActionPair<R, P>
-where
-    R: ResrcTy,
-    P: ParamTy,
-{
-    pub action: Box<dyn Fn(&mut Mir, Param<P>) -> Result<Resrc<R>>>,
-    pub undo_action: Option<Box<dyn Fn(&mut Mir, Resrc<R>) -> Result<()>>>,
-}
 use crate::mir::Mir;
 use dyn_clone::DynClone;
-
 //Resource type. Indicates whether a type can be used as a resource. Such a type must be cloneable.
 pub trait ResrcTy {
     fn get_mut(&mut self) -> &mut dyn Any;
@@ -42,6 +33,7 @@ impl ResrcTy for () {
     }
 }
 
+//A thin wrapper around a resource.
 pub struct Resrc<T>(T);
 impl<T> Resrc<T> {
     pub fn into_type(self) -> T {
@@ -65,21 +57,7 @@ impl<T> std::ops::Deref for Resrc<T> {
         &self.0
     }
 }
-// impl<R: ResrcTy> ResrcTy for Box<R> {
-//     fn get_resource(&mut self) -> &mut dyn Any {
-//         self.get_resource()
-//     }
-// }
 
-// #[undo_action]
-// pub fn undo_test_fn(mut rsrc: Resrc<TestRsrc>) -> Result<()> {
-//     println!("undo_test_fn: {}", rsrc.name);
-//     Ok(())
-// }
-// #[undo_action]
-// pub fn undo_clean() -> Result<()> {
-//     Ok(())
-// }
 pub trait ActionTy {
     fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>>;
     fn undo(&mut self, mir: &mut Mir, rsrc: Resrc<&mut dyn ResrcTy>) -> Result<()>;
@@ -87,6 +65,10 @@ pub trait ActionTy {
     fn set_id(&mut self, id: u128);
 }
 
+//An action represents something that induce a change in the current state of the kernel.
+//An action contains two functions, one that executes the action, and optionaly one that undoes the action.
+//Th executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
+//Th undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
 pub struct Action<'a, R: ResrcTy, P: ParamTy> {
     pub action_id: u128,
     pub param: P,
@@ -292,5 +274,6 @@ impl<'ac, 'b: 'ac> Actman<'ac> {
     }
 }
 mod common;
+pub mod request;
 #[cfg(test)]
 mod test;
