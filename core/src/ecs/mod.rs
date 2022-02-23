@@ -77,6 +77,9 @@ impl EntityManager {
     pub fn get_entity_mut(&mut self, entity: Entity) -> Option<bevy_ecs::world::EntityMut> {
         self.world.get_entity_mut(entity)
     }
+    pub fn get_entity_count(&self) -> usize {
+        self.world.entities().len() as usize
+    }
 }
 
 #[cfg(test)]

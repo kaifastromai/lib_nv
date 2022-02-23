@@ -17,31 +17,34 @@ impl Mir {
         }
     }
     //adds an entity
-    // pub fn add_entity(&mut self, class: String) -> bv::entity::Entity {
-    //     self.em.add_entity(class)
-    // }
-    // pub fn add_component<T: bv::component::Component>(
-    //     &mut self,
-    //     entity: bv::entity::Entity,
-    //     component: T,
-    // ) {
-    //     self.em.add_component(entity, component);
-    // }
-    // pub fn add_archetype<T: archetypes::Archetype>(
-    //     &mut self,
-    //     entity: bv::entity::Entity,
-    //     archetype: T,
-    // ) {
-    //     self.em.add_archetype(entity, archetype);
-    // }
+    pub fn add_entity(&mut self, class: String) -> bv::entity::Entity {
+        self.em.add_entity(class)
+    }
+    pub fn add_component<T: bv::component::Component>(
+        &mut self,
+        entity: bv::entity::Entity,
+        component: T,
+    ) {
+        self.em.add_component(entity, component);
+    }
+    pub fn add_archetype<T: archetypes::Archetype>(
+        &mut self,
+        entity: bv::entity::Entity,
+        archetype: T,
+    ) {
+        self.em.add_archetype(entity, archetype);
+    }
 
-    // pub fn add_bundle<T: bv::bundle::Bundle>(&mut self, entity: bv::entity::Entity, bundle: T) {
-    //     self.em.add_bundle(entity, bundle);
-    // }
-    // pub fn create_project(&mut self, name: String, desc: String) {
-    //     self.proj.name = name;
-    //     self.proj.description = desc;
-    // }
+    pub fn add_bundle<T: bv::bundle::Bundle>(&mut self, entity: bv::entity::Entity, bundle: T) {
+        self.em.add_bundle(entity, bundle);
+    }
+    pub fn create_project(&mut self, name: String, desc: String) {
+        self.proj.name = name;
+        self.proj.description = desc;
+    }
+    pub fn get_entity_count(&self) -> usize {
+        self.em.get_entity_count()
+    }
 }
 
 pub trait Returnable {}

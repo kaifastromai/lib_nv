@@ -27,27 +27,17 @@ where
 use crate::mir::Mir;
 use dyn_clone::DynClone;
 
-//Resource type. Indicates whether a type can be used as a resource. Such a type must be clonable.
+//Resource type. Indicates whether a type can be used as a resource. Such a type must be cloneable.
 pub trait ResrcTy {
-    fn get_resource(&mut self) -> &mut dyn Any;
+    fn get_mut(&mut self) -> &mut dyn Any;
 }
 pub trait ParamTy: Clone {
     fn get_param(self) -> Box<dyn Any>;
 }
 pub struct Param<T: ParamTy>(T);
-#[derive(Debug, Clone, Resource)]
-pub struct TestRsrc {
-    pub name: String,
-}
-
-impl From<Resrc<TestRsrc>> for TestRsrc {
-    fn from(resrc: Resrc<TestRsrc>) -> Self {
-        resrc.into_type()
-    }
-}
 
 impl ResrcTy for () {
-    fn get_resource(&mut self) -> &mut dyn Any {
+    fn get_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -64,8 +54,15 @@ impl<T> Resrc<T> {
     }
 }
 impl ResrcTy for Box<dyn ResrcTy> {
-    fn get_resource(&mut self) -> &mut dyn Any {
-        self.get_resource()
+    fn get_mut(&mut self) -> &mut dyn Any {
+        self.get_mut()
+    }
+}
+//impl deref for Resrc<T> that returns the inner type
+impl<T> std::ops::Deref for Resrc<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 // impl<R: ResrcTy> ResrcTy for Box<R> {
@@ -83,24 +80,25 @@ impl ResrcTy for Box<dyn ResrcTy> {
 // pub fn undo_clean() -> Result<()> {
 //     Ok(())
 // }
-pub trait ActionTy<'a> {
-    fn exec(&mut self, mir: &'a mut Mir) -> Result<Box<dyn ResrcTy>>;
-    fn undo(&mut self, mir: &'a mut Mir, rsrc: Resrc<&mut dyn ResrcTy>) -> Result<()>;
+pub trait ActionTy {
+    fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>>;
+    fn undo(&mut self, mir: &mut Mir, rsrc: Resrc<&mut dyn ResrcTy>) -> Result<()>;
     fn action_id(&self) -> u128;
+    fn set_id(&mut self, id: u128);
 }
 
-pub struct Action<'a, R: ResrcTy + 'static, P: ParamTy> {
+pub struct Action<'a, R: ResrcTy, P: ParamTy> {
     pub action_id: u128,
     pub param: P,
     exec: &'a dyn Fn(&mut Mir, P) -> Result<Box<R>>,
-    undo: Option<&'a dyn Fn(&mut Mir, Resrc<Box<R>>) -> Result<()>>,
+    undo: Option<&'a dyn Fn(&mut Mir, Resrc<&R>) -> Result<()>>,
     pub is_complete: bool,
 }
 impl<'a, R: ResrcTy, P: ParamTy> Action<'a, R, P> {
     //Create a new action, specifying the function to execute and the function that undoes the action
     pub fn new(
         exec: &'a impl Fn(&mut Mir, P) -> Result<Box<R>>,
-        undo: &'a impl Fn(&mut Mir, Resrc<Box<R>>) -> Result<()>,
+        undo: &'a impl Fn(&mut Mir, Resrc<&R>) -> Result<()>,
         param: P,
     ) -> Self {
         Action {
@@ -125,7 +123,7 @@ impl<'a, R: ResrcTy, P: ParamTy> Action<'a, R, P> {
         self.is_complete = true;
         (self.exec)(mir, self.param.clone())
     }
-    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<Box<R>>) -> Result<()> {
+    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&R>) -> Result<()> {
         if (self.is_complete) {
             let res = match self.undo {
                 Some(u) => Ok(u),
@@ -140,7 +138,7 @@ impl<'a, R: ResrcTy, P: ParamTy> Action<'a, R, P> {
         ));
     }
 }
-impl<'a, R: ResrcTy + Clone + 'static, P: ParamTy> ActionTy<'a> for Action<'a, R, P> {
+impl<'a, R: ResrcTy + Clone + 'static, P: ParamTy> ActionTy for Action<'a, R, P> {
     fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
         let res = self.exec(mir)?;
         //convert R to Box<dyn ResrcTy>
@@ -150,12 +148,15 @@ impl<'a, R: ResrcTy + Clone + 'static, P: ParamTy> ActionTy<'a> for Action<'a, R
     }
     fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&mut dyn ResrcTy>) -> Result<()> {
         let rsrc = resrc.into_type();
-        let r = rsrc.get_resource().downcast_mut::<R>().unwrap();
-        let boxed = Box::from(*r);
-        self.undo(mir, Resrc::new(boxed))
+        let r = rsrc.get_mut().downcast_ref::<R>().unwrap();
+        let boxed = Box::from(r.clone());
+        self.undo(mir, Resrc::new(r))
     }
     fn action_id(&self) -> u128 {
         self.action_id
+    }
+    fn set_id(&mut self, id: u128) {
+        self.action_id = id;
     }
 }
 
@@ -228,7 +229,7 @@ impl std::ops::SubAssign<usize> for ActionCursor {
 
 //Manages actions and their resources
 pub struct Actman<'ac> {
-    pub actions: VecDeque<Box<dyn ActionTy<'ac>>>,
+    pub actions: VecDeque<Box<dyn ActionTy + 'ac>>,
     pub resources: HashMap<u128, Box<dyn ResrcTy>>,
     pub mir_ref: &'ac mut Mir,
     //indicates position in undo
@@ -236,7 +237,7 @@ pub struct Actman<'ac> {
 }
 //implement actman
 impl<'ac, 'b: 'ac> Actman<'ac> {
-    pub fn new(mir_ref: &'ac mut Mir) -> Self {
+    pub fn new(mir_ref: &'b mut Mir) -> Self {
         Self {
             actions: VecDeque::new(),
             resources: HashMap::new(),
@@ -244,7 +245,7 @@ impl<'ac, 'b: 'ac> Actman<'ac> {
             cursor: ActionCursor::new(),
         }
     }
-    pub fn register_action<T: ActionTy<'ac> + 'ac>(&mut self, action: T) {
+    pub fn register_action<T: ActionTy + 'ac>(&mut self, action: T) {
         //if the actioncursor is not at the front of the queue,
         //we must invalidate everything after the cursor
         if self.cursor.cursor > 0 {
@@ -256,7 +257,7 @@ impl<'ac, 'b: 'ac> Actman<'ac> {
     //Advances the action cursor forward by one. If the cursor is in sync with the latest action
     //(at the front of queue),this does nothing. Otherwise, it executes the action at the current cursors location,
     //and advances by 1
-    pub fn advance(&'b mut self) -> Result<()> {
+    pub fn advance(&mut self) -> Result<()> {
         if (!self.cursor.is_valid()) {
             return Err(anyhow!("Cursor is not valid!"));
         }
@@ -265,13 +266,14 @@ impl<'ac, 'b: 'ac> Actman<'ac> {
         let rsrc = action.exec(self.mir_ref)?;
         //generate a resource id
         let resource_id = uuid::Uuid::new_v4().as_u128();
+        action.set_id(resource_id);
         self.resources.insert(resource_id, rsrc);
         //advance the cursor
         self.cursor += 1;
         Ok(())
     }
     //Move the action cursor backward by one, undoing the action the cursor was pointing at
-    pub fn regress(&'ac mut self) -> Result<()> {
+    pub fn regress(&mut self) -> Result<()> {
         let mut action = self.actions.pop_back().unwrap();
         let action_id = action.action_id();
         let r = &mut *self.resources.get_mut(&action_id).unwrap();
