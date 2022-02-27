@@ -1,5 +1,6 @@
 use nvproc::Param;
 
+use super::request::{Reqman, Request};
 use super::*;
 #[derive(Clone, Param)]
 pub struct TestParam {
@@ -14,13 +15,10 @@ pub struct PubResponse {
     pub name: String,
     pub ent_id: bevy_ecs::entity::Entity,
 }
-pub fn get_entity(mir: &mut Mir, p: TestParam) -> Result<Box<dyn ResrcTy>> {
-    let ent_id = mir.add_entity(p.name.clone());
-    let mut rsrc = TestRsrc {
-        name: p.name,
-        ent_id,
-    };
-    Ok(Box::new(rsrc))
+pub fn get_entity(mir: &mut Mir, p: (String, i32)) -> Result<PubResponse> {
+    let ent_id = mir.add_entity(p.0.clone());
+    let mut res = PubResponse { name: p.0, ent_id };
+    Ok(res)
 }
 pub fn test_fn(mir: &mut Mir, p: TestParam) -> Result<Box<TestRsrc>> {
     let ent = mir.em.add_entity(p.name);
@@ -39,7 +37,7 @@ pub fn undo(mir: &mut Mir, rsrc: Resrc<&TestRsrc>) -> Result<()> {
 
 #[test]
 fn test_action_register() {
-    let action = Action::<TestRsrc, TestParam>::new(
+    let action = Action::new(
         &test_fn,
         &undo,
         TestParam {
@@ -55,4 +53,12 @@ fn test_action_register() {
         act.regress();
     }
     assert_eq!(mir.get_entity_count(), 0);
+}
+#[test]
+fn test_action_request() {
+    let req = Request::new(&get_entity, (String::from("test"), 1));
+    let mut mir_ref = Mir::new();
+    let mut reqman = Reqman::new(&mut mir_ref);
+    let res = reqman.request(req).unwrap();
+    assert_eq!(res.name, "test");
 }

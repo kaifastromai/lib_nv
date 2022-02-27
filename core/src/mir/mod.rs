@@ -1,20 +1,26 @@
 use std::collections::VecDeque;
 
+use crate::action::Actman;
+use crate::action::request::Reqman;
 use crate::ecs::archetypes;
 use crate::ecs::bevy_ecs as bv;
-use crate::ecs::EntityManager;
+use crate::ecs::Entman;
 use crate::Project;
 
-pub struct Mir {
-    pub em: EntityManager,
+pub struct Mir<'a> {
+    pub em: Entman,
     pub proj: Project,
+    pub reqman: Reqman<'a>,
+    pub actman: Actman<'a>,
 }
-impl Mir {
+impl<'a> Mir<'a> {
     pub fn new() -> Self {
-        Mir {
-            em: EntityManager::new(),
+        let m=Mir {
+            em: Entman::new(),
             proj: Project::new_empty(),
-        }
+            reqman: todo!(),
+            actman: todo!(),
+        };
     }
     //adds an entity
     pub fn add_entity(&mut self, class: String) -> bv::entity::Entity {
@@ -47,20 +53,4 @@ impl Mir {
     }
 }
 
-pub trait Returnable {}
-pub trait Event {
-    fn exec(&self, mir: &mut Mir);
-}
-pub struct EventQueue {
-    pub events: VecDeque<Box<dyn Event>>,
-}
-impl EventQueue {
-    fn new() -> Self {
-        Self {
-            events: VecDeque::new(),
-        }
-    }
-    fn add_event(&mut self, event: impl Event + 'static) {
-        self.events.push_back(Box::new(event));
-    }
-}
+

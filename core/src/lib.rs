@@ -10,7 +10,7 @@ pub trait Referanceable {
 pub mod ecs;
 mod action;
 pub mod mir;
-use ecs::EntityManager;
+use ecs::Entman;
 pub trait MapType {
     fn get_map(&self) -> &dyn MapType;
 }

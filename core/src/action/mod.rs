@@ -69,14 +69,14 @@ pub trait ActionTy {
 //An action contains two functions, one that executes the action, and optionaly one that undoes the action.
 //Th executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
 //Th undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
-pub struct Action<'a, R: ResrcTy, P: ParamTy> {
+pub struct Action<'a, R: ResrcTy, P: Clone> {
     pub action_id: u128,
     pub param: P,
     exec: &'a dyn Fn(&mut Mir, P) -> Result<Box<R>>,
     undo: Option<&'a dyn Fn(&mut Mir, Resrc<&R>) -> Result<()>>,
     pub is_complete: bool,
 }
-impl<'a, R: ResrcTy, P: ParamTy> Action<'a, R, P> {
+impl<'a, R: ResrcTy, P: Clone> Action<'a, R, P> {
     //Create a new action, specifying the function to execute and the function that undoes the action
     pub fn new(
         exec: &'a impl Fn(&mut Mir, P) -> Result<Box<R>>,
@@ -106,7 +106,7 @@ impl<'a, R: ResrcTy, P: ParamTy> Action<'a, R, P> {
         (self.exec)(mir, self.param.clone())
     }
     pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&R>) -> Result<()> {
-        if (self.is_complete) {
+        if self.is_complete {
             let res = match self.undo {
                 Some(u) => Ok(u),
                 None => Err(anyhow!("This action has no undo!")),
@@ -120,7 +120,7 @@ impl<'a, R: ResrcTy, P: ParamTy> Action<'a, R, P> {
         ));
     }
 }
-impl<'a, R: ResrcTy + Clone + 'static, P: ParamTy> ActionTy for Action<'a, R, P> {
+impl<'a, R: ResrcTy + Clone + 'static, P: Clone> ActionTy for Action<'a, R, P> {
     fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
         let res = self.exec(mir)?;
         //convert R to Box<dyn ResrcTy>
@@ -213,13 +213,13 @@ impl std::ops::SubAssign<usize> for ActionCursor {
 pub struct Actman<'ac> {
     pub actions: VecDeque<Box<dyn ActionTy + 'ac>>,
     pub resources: HashMap<u128, Box<dyn ResrcTy>>,
-    pub mir_ref: &'ac mut Mir,
+    pub mir_ref: &'ac mut Mir<'ac>,
     //indicates position in undo
     pub cursor: ActionCursor,
 }
 //implement actman
-impl<'ac, 'b: 'ac> Actman<'ac> {
-    pub fn new(mir_ref: &'b mut Mir) -> Self {
+impl<'ac> Actman<'ac> {
+    pub fn new(mir_ref: &'ac mut Mir<'ac>) -> Self {
         Self {
             actions: VecDeque::new(),
             resources: HashMap::new(),
@@ -240,7 +240,7 @@ impl<'ac, 'b: 'ac> Actman<'ac> {
     //(at the front of queue),this does nothing. Otherwise, it executes the action at the current cursors location,
     //and advances by 1
     pub fn advance(&mut self) -> Result<()> {
-        if (!self.cursor.is_valid()) {
+        if !self.cursor.is_valid() {
             return Err(anyhow!("Cursor is not valid!"));
         }
         let mut action = self.actions.get_mut(self.cursor.into()).unwrap();

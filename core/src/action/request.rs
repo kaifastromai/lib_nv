@@ -1,3 +1,5 @@
+use std::any::{self, Any};
+
 use crate::mir::Mir;
 
 use super::ParamTy;
@@ -11,12 +13,13 @@ pub trait RequestTy {}
 //A response returns the requested data/information to Mir.
 //A response cannot contain any references to Mir. Everything must be cloned.
 pub trait ResponseTy {}
+impl<T: Any> ResponseTy for T {}
 
-pub struct Request<'a, R: ResponseTy, P: ParamTy> {
+pub struct Request<'a, R: ResponseTy, P: Clone> {
     pub param: P,
     req_fn: &'a dyn Fn(&mut Mir, P) -> Result<R>,
 }
-impl<'a, R: ResponseTy, P: ParamTy> Request<'a, R, P> {
+impl<'a, R: ResponseTy, P: Clone> Request<'a, R, P> {
     pub fn new(req_fn: &'a dyn Fn(&mut Mir, P) -> Result<R>, param: P) -> Self {
         Request { param, req_fn }
     }
@@ -26,13 +29,13 @@ impl<'a, R: ResponseTy, P: ParamTy> Request<'a, R, P> {
 }
 //Manages requests and responses for Mir.
 pub struct Reqman<'r> {
-    mir_ref: &'r mut Mir,
+    mir_ref: &'r mut Mir<'r>,
 }
 impl<'r> Reqman<'r> {
     pub fn new(mir_ref: &'r mut Mir) -> Self {
         Reqman { mir_ref }
     }
-    pub fn request<R: ResponseTy, P: ParamTy>(&mut self, req: Request<R, P>) -> Result<R> {
+    pub fn request<R: ResponseTy, P: Clone>(&mut self, req: Request<R, P>) -> Result<R> {
         let res = req.exec(self.mir_ref)?;
         Ok(res)
     }

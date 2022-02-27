@@ -1,1 +1,1 @@
-pub use crate::ecs::{EntityManager};
+pub use crate::ecs::{Entman};
