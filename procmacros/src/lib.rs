@@ -1,7 +1,7 @@
 #![feature(proc_macro_diagnostic)]
 extern crate proc_macro;
 use proc_macro::{Diagnostic, Level, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote, ToTokens, __private::Span};
 use syn::{
     parse::{Parse, Parser},
     parse_macro_input, DeriveInput, Field,
@@ -9,7 +9,7 @@ use syn::{
 use utils::StringExt;
 
 #[proc_macro_derive(Resource)]
-pub fn resoure_derive(input: TokenStream) -> TokenStream {
+pub fn resource_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     //it is an error of the type has generic parameters
@@ -18,8 +18,13 @@ pub fn resoure_derive(input: TokenStream) -> TokenStream {
     }
     //call the structs new function
     let struct_impl = quote! {
-        impl Resource for #name{
-            fn get_resource(&mut self)->&mut dyn Resource{
+        impl ResrcTy for #name{
+            fn get_mut(&mut self)->&mut dyn Any{
+               self
+            }
+        }
+        impl ResrcTy for &'static #name{
+            fn get_mut(&mut self)->&mut  dyn Any{
                 self
             }
         }
@@ -27,51 +32,145 @@ pub fn resoure_derive(input: TokenStream) -> TokenStream {
 
     struct_impl.into()
 }
+#[proc_macro_derive(Param)]
+pub fn param_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    //it is an error of the type has generic parameters
+    if !input.generics.params.is_empty() {
+        Diagnostic::new(Level::Error, "Param can not have generic parameters").emit();
+    }
+    //call the structs new function
+    let struct_impl = quote! {
+        impl ParamTy for #name{
+            fn get_param(self)->Box<dyn Any>{
+                Box::new(self)
+            }
+        }
+
+    };
+
+    struct_impl.into()
+}
+
 //Generates implementation of actionfn for any function
-// #[proc_macro_attribute]
-// pub fn action_fn_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
-//     let item = parse_macro_input!(item as syn::ItemFn);
-//     let attr = parse_macro_input!(attr as syn::AttributeArgs);
+#[proc_macro_attribute]
+pub fn undo_action(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::ItemFn);
+    let attr = parse_macro_input!(attr as syn::AttributeArgs);
 
-//     //get function arguments
-//     let mut args = item.sig.inputs.iter();
-//     //if it has more than one argument, it is an error
-//     if args.len() != 1 {
-//         Diagnostic::new(Level::Error, "ActionFn can only have one argument").emit();
-//     }
-//     let arg = args.next();
-//     let arg;
-//     let arg_impl = match arg {
-//         Some(arg) => {
-//             quote! {
-//                 impl Resource for #arg{
-//                     fn get_resource(&mut self)->&mut dyn Resource{
-//                         self
-//                     }
-//                 }
-//             }
-//         }
-//         None => {
-//             quote! {
-//               impl Resource for (){
-//                    fn get_resource(&mut self)->&mut dyn Resource{
-//                         self
-//                    }
-//               }
-//             }
-//         }
-//     };
-//     let into_action_fn = quote! {
-//         impl IntoActionFn for #item{
-//             fn into_action_fn(self)->dyn ActionFn{
-//                 ActionFn{
+    //get function arguments
+    let mut args = item.sig.inputs.iter();
 
-//                 }
-//             }
-//         }
-//     };
+    //if there are more than 1 argument, it is an error
+    if args.len() > 1 {
+        Diagnostic::new(Level::Error, "Undo action can only have one argument").emit();
+    }
+    //get first argument
 
-// }
+    let resrc_arg = args.next();
+
+    //get the inner T in the Resrc<T>
+    let inner_t = match resrc_arg {
+        Some(syn::FnArg::Typed(syn::PatType { ref ty, .. })) => match ty.as_ref() {
+            syn::Type::Path(syn::TypePath { path, .. }) => {
+                let s = path.segments.last();
+                match s {
+                    Some(seg) => {
+                        let arg = &seg.arguments;
+                        let arg = match arg {
+                            syn::PathArguments::None => {
+                                Diagnostic::new(Level::Error, "Unrecognized resource argument. The resource must state the type it needs").emit();
+                                panic!()
+                            }
+                            syn::PathArguments::AngleBracketed(a) => a.args.iter().next().unwrap(),
+                            syn::PathArguments::Parenthesized(_) => {
+                                Diagnostic::new(Level::Error, "Unrecognized resource argument. The resource must state the type it needs").emit();
+                                panic!()
+                            }
+                        };
+
+                        quote! {#arg}
+                    }
+                    None => {
+                        Diagnostic::new(Level::Error, "Unrecognized resource argument").emit();
+                        panic!()
+                    }
+                }
+            }
+            _ => {
+                Diagnostic::new(Level::Error, "Unrecognized resource argument").emit();
+                panic!()
+            }
+        },
+
+        _ => quote! {()},
+    };
+
+    //get the name of the resrc argument
+    let resrc_arg_name = match resrc_arg {
+        Some(syn::FnArg::Typed(syn::PatType { ref pat, .. })) => match pat.as_ref() {
+            syn::Pat::Ident(syn::PatIdent { ref ident, .. }) => ident.to_string(),
+            _ => {
+                Diagnostic::new(Level::Error, "Undo action can only have one argument").emit();
+                panic!()
+            }
+        },
+        _ => String::from("resrc"),
+    };
+    let resrc_arg_name = syn::Ident::new(&resrc_arg_name, Span::call_site());
+
+    let resrc_arg = match resrc_arg {
+        Some(resrc_arg) => resrc_arg.clone(),
+        //This action does not need any resource. Construct an empty resource
+        None => {
+            //construct a new fnarg
+            let fn_arg: syn::FnArg = syn::parse_str("resrc:Resrc<()>").unwrap();
+            fn_arg
+        }
+    };
+    //get the function name
+    let name = &item.sig.ident;
+
+    //get the function return type
+    let ret_type = &item.sig.output;
+    //get the function body
+    let body = &item.block;
+    let new_decl = quote! {
+        pub fn #name(mir:&mut Mir,mut #resrc_arg_name: Resrc<&dyn ResrcTy>) -> Result<()> {
+            let #resrc_arg_name :&#inner_t= #resrc_arg_name.0.get_resource().downcast_ref::<#inner_t>().unwrap();
+            #body
+        }
+    };
+    new_decl.into()
+}
+#[proc_macro_derive(Action)]
+pub fn action_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    //action is of the form Action<'a,R:ResrcTy,P:ParamTy>
+    //get the type parameters
+    let mut type_params = input.generics.params.iter();
+    //get the first type parameter
+    let life_time_param = type_params.next();
+    //get the second type parameter
+    let resource_param = type_params.next();
+    //get the third type parameter
+    let param_param = type_params.next();
+    let struct_impl = quote! {
+        impl<'a,R:ResrcTy,P:ParamTy> ActionTy for #name<'a,R,P>{
+            fn exec(&mut self, mir:&mut Mir)->Result<Box<dyn ResrcTy>>{
+                self.exec(mir)
+            }
+            fn undo(&mut self,mir:&mut Mir,rsrc:Resrc<&dyn ResrcTy>)->Result<()>{
+                let resrc=rsrc.0.get_resource().downcast_ref::<R>().unwrap();
+                self.undo(mir,rsrc)
+            }
+        }
+    };
+
+    struct_impl.into()
+}
 
 #[proc_macro_derive(Component)]
 pub fn component_derive(input: TokenStream) -> TokenStream {
