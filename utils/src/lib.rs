@@ -159,6 +159,12 @@ pub mod text {
     }
 }
 
+pub mod uuid {
+    pub fn generate() -> u128 {
+        uuid::Uuid::new_v4().as_u128()
+    }
+}
+
 #[cfg(test)]
 mod test_super {
     use super::*;

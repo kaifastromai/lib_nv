@@ -3,7 +3,7 @@ pub mod archetypes;
 pub mod prelude;
 use super::*;
 pub use serde::{Deserialize, Serialize};
-use utils::prelude::*;
+use utils::{prelude::*, uuid};
 
 use anyhow::{anyhow, Result};
 use std::{
@@ -14,12 +14,22 @@ use std::{
 pub type Id = u128;
 //A component type. It's id corrosponds to the entity it belongs to.
 pub trait ComponentTy: Any {
-    fn get_owning_entity(&self) -> Id;
-    fn get_type_id(&self) -> TypeId;
+    fn get_type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
     fn get_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
 }
+pub trait ComponentReqsTy: 'static + Default {
+    fn get_type_id() -> TypeId {
+        TypeId::of::<Self>()
+    }
+    fn get_type_name() -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+impl<T> ComponentReqsTy for T where T: ComponentTy + Default {}
 
 pub struct Entity {
     id: Id,
@@ -63,14 +73,13 @@ impl Entity {
 //A reference to a specific entity and its components
 pub struct EntityRef {}
 pub struct EntityRefMut {}
-pub struct ComponentRef<'a, T: ComponentTy> {
-    entity: Id,
-    component: &'a T,
-}
-pub struct ComponentMut<'a, T: ComponentTy> {
-    entity: Id,
-    component: &'a mut T,
-}
+// pub struct ComponentRef<'a, T: ComponentTy> {
+//     component: &'a Component<T>,
+// }
+// pub struct ComponentMut<'a, T: ComponentTy> {
+//     entity: Id,
+//     component: &'a mut Component<T>,
+// }
 //Stores all the components.
 //The components are stored in bins of common types hashed by their type id.
 
@@ -101,14 +110,54 @@ impl<T: ComponentTy> CommonComponentStoreTy for CommonComponentStore<T> {
         std::any::TypeId::of::<T>()
     }
 }
+//----------------------------------------------------------------------------------------------------------------------//
+
+pub struct Component<T: ComponentTy> {
+    id: Id,
+    pub owning_entity: Option<Id>,
+    pub component: T,
+}
+pub struct ComponentInfo {
+    pub id: Id,
+    pub owning_entity: Option<Id>,
+}
+
+impl<T: ComponentTy + Default> Component<T> {
+    pub fn new(entity: Id) -> Self {
+        Self {
+            id: uuid::generate(),
+            owning_entity: Some(entity),
+            component: Default::default(),
+        }
+    }
+    //An orphan component has no owning entity
+    pub fn new_orphan(component: T) -> Self {
+        Self {
+            id: uuid::generate(),
+            owning_entity: None,
+            component,
+        }
+    }
+    pub fn into(self) -> T {
+        self.component
+    }
+}
+
+//impl deref
+impl<'a, T: ComponentTy> std::ops::Deref for Component<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.component
+    }
+}
 
 pub struct CommonComponentStore<T: ComponentTy> {
     //the typs of component this store contains
     type_id: TypeId,
     //the components of this store
-    components: HashMap<Id, T>,
+    components: HashMap<Id, Component<T>>,
 }
-impl<T: ComponentTy> CommonComponentStore<T> {
+impl<T: ComponentTy + ComponentReqsTy> CommonComponentStore<T> {
     pub fn new() -> Self {
         Self {
             type_id: std::any::TypeId::of::<T>(),
@@ -118,31 +167,31 @@ impl<T: ComponentTy> CommonComponentStore<T> {
     pub fn get_type_id(&self) -> TypeId {
         self.type_id
     }
-    pub fn get_components(&self) -> Vec<&T> {
-        self.components.values().collect()
-    }
-    pub fn insert(&mut self, entity: Id, component: T) -> Result<()> {
-        if self.components.contains_key(&entity) {
+    pub fn insert(&mut self, owning_entity: Id) -> Result<()> {
+        if self.components.contains_key(&owning_entity) {
             return Err(anyhow!(
                 "Entity already has component of type {}",
-                component.get_type_name()
+                <T as ComponentReqsTy>::get_type_name()
             ));
         }
-        self.components.insert(entity, component);
+        self.components
+            .insert(owning_entity, Component::new(owning_entity));
         Ok(())
     }
 }
 pub struct Storage {
     //The bins of components. Points to a vector of components.
     bins: HashMap<std::any::TypeId, Box<dyn CommonComponentStoreTy>>,
+    component_infos: HashMap<Id, ComponentInfo>,
 }
 impl Storage {
     pub fn new() -> Self {
         Self {
             bins: HashMap::new(),
+            component_infos: HashMap::new(),
         }
     }
-    pub fn insert_component<T: ComponentTy>(&mut self, entity: Id, component: T) -> Result<()> {
+    pub fn insert_component<T: ComponentTy + ComponentReqsTy>(&mut self, entity: Id) -> Result<()> {
         let id = std::any::TypeId::of::<T>();
         match self.bins.contains_key(&id) {
             true => {
@@ -151,18 +200,18 @@ impl Storage {
                 let store = (store.as_mut())
                     .downcast_mut::<CommonComponentStore<T>>()
                     .unwrap();
-                store.components.insert(entity, component);
+                store.insert(entity);
             }
             false => {
                 let mut store = CommonComponentStore::<T>::new();
-                store.insert(entity, component);
+                store.insert(entity);
                 self.bins.insert(id, Box::new(store));
             }
         }
 
         Ok(())
     }
-    pub fn get_component<T: ComponentTy>(&self, entity: Id) -> Result<ComponentRef<T>> {
+    pub fn get_component<T: ComponentTy>(&self, entity: Id) -> Result<&Component<T>> {
         let id = std::any::TypeId::of::<T>();
         match self.bins.contains_key(&id) {
             true => {
@@ -172,7 +221,7 @@ impl Storage {
                     .downcast_ref::<CommonComponentStore<T>>()
                     .unwrap();
                 match store.components.get(&entity) {
-                    Some(component) => Ok(ComponentRef { entity, component }),
+                    Some(component) => Ok(component),
                     None => Err(anyhow!(
                         "Entity does not have component of type {}",
                         std::any::type_name::<T>()
@@ -185,7 +234,7 @@ impl Storage {
             )),
         }
     }
-    pub fn get_component_mut<T: ComponentTy>(&mut self, entity: Id) -> Result<ComponentMut<T>> {
+    pub fn get_component_mut<T: ComponentTy>(&mut self, entity: Id) -> Result<&mut Component<T>> {
         let id = std::any::TypeId::of::<T>();
         match self.bins.contains_key(&id) {
             true => {
@@ -195,7 +244,7 @@ impl Storage {
                     .downcast_mut::<CommonComponentStore<T>>()
                     .unwrap();
                 match store.components.get_mut(&entity) {
-                    Some(component) => Ok(ComponentMut { entity, component }),
+                    Some(component) => Ok(component),
                     None => Err(anyhow!(
                         "Entity does not have component of type {}",
                         std::any::type_name::<T>()
@@ -212,16 +261,16 @@ impl Storage {
 
 pub struct Entman {
     entities: HashMap<Id, Entity>,
-    components: HashMap<Id, Box<dyn ComponentTy>>,
+    storage: Storage,
 }
 impl Entman {
     pub fn new() -> Self {
         Entman {
             entities: HashMap::new(),
-            components: HashMap::new(),
+            storage: Storage::new(),
         }
     }
-    pub fn add_entity(&mut self, class: String) -> Id {
+    pub fn add_entity(&mut self) -> Id {
         todo!()
     }
     pub fn remove_entity(&mut self, entity: Id) {
@@ -230,7 +279,9 @@ impl Entman {
     pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
         todo!()
     }
-    pub fn add_archetype<T: archetypes::Archetype>(&mut self, entity: Id, archetype: T) {}
+    pub fn add_archetype<T: archetypes::ArchetypeTy>(&mut self, archetype: T) {
+
+    }
     pub fn get_entity(&self, entity: Id) -> Option<bevy_ecs::world::EntityRef> {
         todo!()
     }

@@ -2,13 +2,13 @@ use nvcore::mir::Mir;
 
 #[repr(C)]
 //Context holds the current state of the kernel. It must be exposed to the C API.
-pub struct Context {
+pub struct Context<'a> {
     //Raw ptr to the Mir struct.
-    pub mir: *mut Mir,
+    pub mir: *mut Mir<'a>,
 }
 
 //implement context
-impl Context {
+impl Context<'_> {
     #[no_mangle]
     pub extern "C" fn create() -> Self {
         Context {

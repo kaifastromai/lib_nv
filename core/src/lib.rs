@@ -1,16 +1,16 @@
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
 
 use std::collections::HashMap;
-use uuid::Uuid;
 
 pub type IndexType = u128;
 pub trait Referanceable {
     fn get_ref(&self) -> Reference;
 }
-pub mod ecs;
 mod action;
+pub mod ecs;
 pub mod mir;
 use ecs::Entman;
+use utils::uuid;
 pub trait MapType {
     fn get_map(&self) -> &dyn MapType;
 }
@@ -165,7 +165,7 @@ pub struct Project {
 impl Project {
     pub fn new(name: &str, description: &str) -> Self {
         Project {
-            id: Uuid::new_v4().as_u128(),
+            id: uuid::generate(),
             name: String::from(name),
             description: String::from(description),
             manuscripts: HashMap::new(),
@@ -173,7 +173,7 @@ impl Project {
     }
     pub fn new_empty() -> Self {
         Project {
-            id: Uuid::new_v4().as_u128(),
+            id: uuid::generate(),
             name: String::new(),
             description: String::new(),
             manuscripts: HashMap::new(),
@@ -208,7 +208,6 @@ impl Project {
         //add all manuscript references
         for manuscript in self.get_all_manuscripts() {
             references.push(manuscript.get_ref());
-          
         }
 
         references

@@ -1,3 +1,7 @@
+pub struct ArchetypeComponent {
+    pub archetype_name: String,
+}
+
 pub trait BinaryTy {
     fn to_bytes(&self) -> Vec<u8>;
 }

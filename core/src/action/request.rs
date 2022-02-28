@@ -1,6 +1,6 @@
 use std::any::{self, Any};
 
-use crate::mir::Mir;
+use crate::mir::{Mir, MirData};
 
 use super::ParamTy;
 use anyhow::{anyhow, Result};
@@ -17,22 +17,22 @@ impl<T: Any> ResponseTy for T {}
 
 pub struct Request<'a, R: ResponseTy, P: Clone> {
     pub param: P,
-    req_fn: &'a dyn Fn(&mut Mir, P) -> Result<R>,
+    req_fn: &'a dyn Fn(&mut MirData, P) -> Result<R>,
 }
 impl<'a, R: ResponseTy, P: Clone> Request<'a, R, P> {
-    pub fn new(req_fn: &'a dyn Fn(&mut Mir, P) -> Result<R>, param: P) -> Self {
+    pub fn new(req_fn: &'a dyn Fn(&mut MirData, P) -> Result<R>, param: P) -> Self {
         Request { param, req_fn }
     }
-    pub fn exec(&self, mir: &mut Mir) -> Result<R> {
+    pub fn exec(&self, mir: &mut MirData) -> Result<R> {
         (self.req_fn)(mir, self.param.clone())
     }
 }
 //Manages requests and responses for Mir.
 pub struct Reqman<'r> {
-    mir_ref: &'r mut Mir<'r>,
+    mir_ref: &'r mut MirData,
 }
 impl<'r> Reqman<'r> {
-    pub fn new(mir_ref: &'r mut Mir<'r>) -> Self {
+    pub fn new(mir_ref: &'r mut MirData) -> Self {
         Reqman { mir_ref }
     }
     pub fn request<R: ResponseTy, P: Clone>(&mut self, req: Request<R, P>) -> Result<R> {

@@ -13,7 +13,6 @@ test = true
 [dependencies]
 bitvec = "0.22.3"
 num = "0.4.0"
-uuid = { version = "0.8.2", features = ["serde", "v4"] }
 nvproc = { path = "../procmacros" }
 getset = "0.1.2"
 utils = { version = "0.1.0", path = "../utils" }

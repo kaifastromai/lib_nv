@@ -2,44 +2,53 @@ use std::collections::VecDeque;
 
 use crate::action::request::Reqman;
 use crate::action::Actman;
-use crate::ecs::Id;
 use crate::ecs::archetypes;
 use crate::ecs::ComponentTy;
 use crate::ecs::Entity;
 use crate::ecs::Entman;
+use crate::ecs::Id;
 use crate::Project;
 
-pub struct Mir<'a> {
+pub struct MirData {
     pub em: Entman,
     pub proj: Project,
-    pub reqman: Reqman<'a>,
-    pub actman: Actman<'a>,
+}
+pub struct Mir<'a> {
+    pub data: MirData,
+    pub reqman: Option<Reqman<'a>>,
+    pub actman: Option<Actman<'a>>,
 }
 impl<'a> Mir<'a> {
     pub fn new() -> Self {
-        let m = Mir {
+        let data = MirData {
             em: Entman::new(),
             proj: Project::new_empty(),
-            reqman: todo!(),
-            actman: todo!(),
         };
+        let mut m = Mir {
+            data,
+            reqman: None,
+            actman: None,
+        };
+        m.actman = Some(Actman::new(&mut m.data));
+        m.reqman = Some(Reqman::new(&mut m.data));
+        m
     }
     //adds an entity
     pub fn add_entity(&mut self, class: String) -> Id {
-        self.em.add_entity(class)
+        todo!()
     }
     pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
-        self.em.add_component(entity, component);
+        self.data.em.add_component(entity, component);
     }
-    pub fn add_archetype<T: archetypes::Archetype>(&mut self, entity: Id, archetype: T) {
-        self.em.add_archetype(entity, archetype);
+    pub fn add_archetype<T: archetypes::ArchetypeTy>(&mut self, entity: Id, archetype: T) {
+        todo!()
     }
 
     pub fn create_project(&mut self, name: String, desc: String) {
-        self.proj.name = name;
-        self.proj.description = desc;
+        self.data.proj.name = name;
+        self.data.proj.description = desc;
     }
     pub fn get_entity_count(&self) -> usize {
-        self.em.get_entity_count()
+        self.data.em.get_entity_count()
     }
 }

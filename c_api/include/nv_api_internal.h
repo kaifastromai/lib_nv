@@ -8,16 +8,4 @@
 
 namespace nv_internal {
 
-struct Context {
-  Mir *mir;
-};
-
-extern "C" {
-
-Context create();
-
-void destroy(Context *ctx);
-
-} // extern "C"
-
 } // namespace nv_internal
