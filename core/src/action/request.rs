@@ -32,7 +32,7 @@ pub struct Reqman<'r> {
     mir_ref: &'r mut Mir<'r>,
 }
 impl<'r> Reqman<'r> {
-    pub fn new(mir_ref: &'r mut Mir) -> Self {
+    pub fn new(mir_ref: &'r mut Mir<'r>) -> Self {
         Reqman { mir_ref }
     }
     pub fn request<R: ResponseTy, P: Clone>(&mut self, req: Request<R, P>) -> Result<R> {
