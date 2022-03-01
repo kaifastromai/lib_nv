@@ -1,6 +1,7 @@
 pub mod archetypes;
 
 pub mod prelude;
+pub mod component;
 use super::*;
 pub use serde::{Deserialize, Serialize};
 use utils::{prelude::*, uuid};
