@@ -7,8 +7,22 @@ use super::*;
 pub struct ArchetypeDescriptor {
     pub components: Vec<TypeId>,
 }
+impl ArchetypeDescriptor {
+    pub fn new<T: ComponentTy>(v: Vec<T>) -> Self {
+        ArchetypeDescriptor {
+            components: v.iter().map(|c| TypeId::of::<T>()).collect(),
+        }
+    }
+}
+impl<T: ComponentTy> From<&'static [&T]> for ArchetypeDescriptor {
+    fn from(v: &'static [&T]) -> Self {
+        ArchetypeDescriptor {
+            components: v.iter().map(|c| TypeId::of::<T>()).collect(),
+        }
+    }
+}
 pub trait ArchetypeTy {
-    fn generate(&self) -> ArchetypeDescriptor;
+    fn describe(&self) -> ArchetypeDescriptor;
 }
 pub struct CharacterArchetype {
     pub archetype_name: String,
@@ -22,7 +36,7 @@ pub struct CharacterArchetype {
     pub spouse: Option<Id>,
 }
 impl ArchetypeTy for CharacterArchetype {
-    fn generate(&self) -> ArchetypeDescriptor {
+    fn describe(&self) -> ArchetypeDescriptor {
         todo!()
     }
 }

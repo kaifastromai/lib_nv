@@ -29,8 +29,8 @@ impl<'a> Mir<'a> {
             reqman: None,
             actman: None,
         };
-        m.actman = Some(Actman::new(&mut m.data));
-        m.reqman = Some(Reqman::new(&mut m.data));
+        // m.actman = Some(Actman::new(&mut m.data));
+        // m.reqman = Some(Reqman::new(&mut m.data));
         m
     }
     //adds an entity
