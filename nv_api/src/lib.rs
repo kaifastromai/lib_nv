@@ -1,14 +1,15 @@
 use nvcore::mir::Mir;
+use std::ffi::c_void;
 
 #[repr(C)]
 //Context holds the current state of the kernel. It must be exposed to the C API.
-pub struct Context<'a> {
+pub struct Context {
     //Raw ptr to the Mir struct.
-    pub mir: *mut Mir<'a>,
+    pub mir: *mut Mir,
 }
 
 //implement context
-impl Context<'_> {
+impl Context {
     #[no_mangle]
     pub extern "C" fn create() -> Self {
         Context {
@@ -21,8 +22,4 @@ impl Context<'_> {
             Box::from_raw(ctx.mir);
         }
     }
-}
-#[repr(C)]
-pub struct Event {
-    pub id: u128,
 }

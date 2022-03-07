@@ -11,5 +11,4 @@ class Context {
 
   ~Context() { nv_internal::destroy(&context); }
 };
-class Mir {};
 }  // namespace nv

@@ -13,17 +13,18 @@ pub struct MirData {
     pub em: Entman,
     pub proj: Project,
 }
-pub struct Mir<'a> {
+pub struct Mir {
     pub data: MirData,
-    pub reqman: Option<Reqman<'a>>,
-    pub actman: Option<Actman<'a>>,
 }
-impl<'a> Mir<'a> {
+impl Mir {
     pub fn new() -> Self {
         let data = MirData {
             em: Entman::new(),
             proj: Project::new_empty(),
         };
+<<<<<<< HEAD
+        let mut m = Mir { data };
+=======
         let mut m = Mir {
             data,
             reqman: None,
@@ -31,6 +32,7 @@ impl<'a> Mir<'a> {
         };
         // m.actman = Some(Actman::new(&mut m.data));
         // m.reqman = Some(Reqman::new(&mut m.data));
+>>>>>>> 116fa2ea521e0155bfd4a765a85b77e7ab4b0e86
         m
     }
     //adds an entity

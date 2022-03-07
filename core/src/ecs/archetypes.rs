@@ -24,7 +24,13 @@ macro_rules! signature {
 }
 
 //An archetype is an entity that has a predefined set of components
+macro_rules! archetype {
+    ( $($signature:tt),* )=> {
 
+
+   
+    };
+}
 pub struct ArchetypeDescriptor {
     pub components: Vec<TypeId>,
 }
