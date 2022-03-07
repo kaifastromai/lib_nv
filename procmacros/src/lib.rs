@@ -175,110 +175,18 @@ pub fn action_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Component)]
 pub fn component_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-
     let name = input.ident;
-    //list of private field idents
-    let private_fields = ["owning_entity", "_is_marked_del"];
 
-    //get all fields of struct
-    let mut fields: Vec<Field> = if let syn::Data::Struct(data) = input.data {
-        data.fields
-            .into_iter()
-            .filter(|f| match &f.ident {
-                Some(i) => !private_fields.contains(&i.to_string().as_str()),
-                _ => true,
-            })
-            .collect()
-    } else {
-        panic!("{} must be struct", name)
+    let impl_block = quote! {
+        impl crate::ecs::ComponentTy for #name{
+          fn clean(&mut self){
+             todo!()
+          }
+        }
     };
-    //make all fields public
-    for field in &mut fields {
-        field.vis = syn::Visibility::Public(syn::VisPublic {
-            pub_token: Default::default(),
-        });
-    }
-    let field_names = fields.iter().map(|f| f.ident.as_ref().unwrap());
-
-    let prop_name = format_ident!("{}Prop", name);
-    let gen = quote! {
-        pub struct #prop_name {
-            #(#fields,)*
-
-        }
-
-        impl Component for #name {
-           type Properties=#prop_name;
-           fn new(owning_entity:IndexType, props:Self::Properties)->Self{
-            Self{
-                _is_marked_del:false,
-                owning_entity,
-                #(#field_names:props.#field_names,)*
-            }
-           }
-            fn get_owning_entity(&self) -> IndexType {
-                self.owning_entity
-            }
-            fn set_owning_entity(&mut self, entity:IndexType) {
-                self.owning_entity = entity;
-            }
-            fn set_is_deleted(&mut self, is_deleted:bool){
-                self._is_marked_del=is_deleted;
-            }
-            fn get_is_deleted(&self)->bool{
-                self._is_marked_del
-            }
-            fn get_type()->components::ComponentType{
-                components::ComponentType::#name
-            }
-
-        }
-        impl PartialEq for #name {
-            fn eq(&self, other: &Self) -> bool {
-                self.owning_entity == other.owning_entity
-            }
-        }
-        impl std::hash::Hash for #name {
-            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-                self.owning_entity.hash(state);
-            }
-        }
-
-    };
-    gen.into()
+    impl_block.into()
 }
-///Generate a component struct for a given struct, implements Component trait and adds a field for the owning entity
-/// It also generates PartialEq and Hash implementations
-/// # Example
-/// ```
-/// #[component]
-/// struct MyComponent {
-///    field1: u32,
-///   field2: u32,
-/// }
-/// ```
-/// # Output
-/// ```
-/// #[derive(Component)]
-/// struct MyComponent {
-///   field1: u32,
-///  field2: u32,
-/// owning_entity: Option<IndexType>,
-/// id: u128,
-/// }
-/// impl Component for MyComponent {
-///   fn get_component_bits() -> u128 {
-///    0x1
-///  }
-/// fn get_owning_entity(&self) -> Option<IndexType> {
-///   self.owning_entity
-/// }
-/// fn set_owning_entity(&mut self, entity:Option<IndexType>) {
-///  self.owning_entity = entity;
-/// }
-/// }
-/// ```
-///
+
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::ItemStruct);

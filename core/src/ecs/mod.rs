@@ -24,7 +24,7 @@ pub trait ComponentTy: Any {
     //Prepare this component to be used by a new entity
     fn clean(&mut self);
 }
-pub trait ComponentReqsTy: 'static + Default {
+pub trait ComponentReqsTy: 'static {
     fn get_type_id() -> TypeId {
         TypeId::of::<Self>()
     }
@@ -124,17 +124,36 @@ impl Entity {
             None => false,
         }
     }
-    pub fn get_components_ref(&mut self) -> &Vec<TypeId> {
-        self.components.as_ref().unwrap()
-    }
-    pub fn get_components(&mut self) -> Vec<TypeId> {
+    pub fn get_signature(&self) -> Vec<TypeId> {
         self.components.as_ref().unwrap().clone()
+    }
+    pub fn get_signature_ref(&self) -> &Vec<TypeId> {
+        &self.components.as_ref().unwrap()
+    }
+    pub fn get_signature_str(&self) -> String {
+        let mut signature = String::new();
+        for tid in self.components.as_ref().unwrap().iter() {
+            signature.push_str(std::any::type_name::<TypeId>());
+            signature.push_str(" ");
+        }
+        signature
     }
 }
 
 //A reference to a specific entity and its components
-pub struct EntityRef {}
-pub struct EntityRefMut {}
+pub struct EntityRef<'a> {
+    pub id: Id,
+    entman: &'a Entman,
+}
+impl<'a> EntityRef<'a> {
+    pub fn has_component<T: ComponentTy>(&self) -> bool {
+        self.entman.get_entity(self.id).has_component::<T>()
+    }
+}
+pub struct EntityRefMut<'a> {
+    entity: Id,
+    entman: &'a mut Entman,
+}
 // pub struct ComponentRef<'a, T: ComponentTy> {
 //     component: &'a Component<T>,
 // }
@@ -180,11 +199,34 @@ pub struct Component<T: ComponentTy> {
     pub component: T,
 }
 impl<T: ComponentTy + Default> Component<T> {
-    pub fn new(entity: Id) -> Self {
+    fn new(entity: Id) -> Self {
+        Self {
+            id: entity,
+            owning_entity: None,
+            component: T::default(),
+        }
+    }
+}
+impl<T: ComponentTy> Component<T> {
+    // pub fn new(entity: Id) -> Self {
+    //     Self {
+    //         id: uuid::generate(),
+    //         owning_entity: Some(entity),
+    //         component: Default::default(),
+    //     }
+    // }
+    pub fn from(entity: Id, component: T) -> Self {
         Self {
             id: uuid::generate(),
             owning_entity: Some(entity),
-            component: Default::default(),
+            component,
+        }
+    }
+    pub fn from_orphan(component: T) -> Self {
+        Self {
+            id: uuid::generate(),
+            owning_entity: None,
+            component,
         }
     }
     //An orphan component has no owning entity
@@ -265,18 +307,8 @@ pub struct CommonComponentStore<T: ComponentTy> {
     components: HashMap<Id, HashMap<ComponentId, Component<T>>>,
     orphans: Vec<OrphanComponent>,
 }
-impl<T: ComponentTy + ComponentReqsTy> CommonComponentStore<T> {
-    pub fn new() -> Self {
-        Self {
-            type_id: std::any::TypeId::of::<T>(),
-            components: HashMap::new(),
-            orphans: Vec::new(),
-        }
-    }
-    pub fn get_type_id(&self) -> TypeId {
-        self.type_id
-    }
-    pub fn insert(&mut self, owning_entity: Id) -> Result<()> {
+impl<T: ComponentTy + Default> CommonComponentStore<T> {
+    pub fn insert_default(&mut self, owning_entity: Id) -> Result<()> {
         //first check if there is an orphan component
         let orphan_component = self.orphans.pop();
         match orphan_component {
@@ -299,6 +331,41 @@ impl<T: ComponentTy + ComponentReqsTy> CommonComponentStore<T> {
         }
         Ok(())
     }
+}
+impl<T: ComponentTy> CommonComponentStore<T> {
+    pub fn new() -> Self {
+        Self {
+            type_id: std::any::TypeId::of::<T>(),
+            components: HashMap::new(),
+            orphans: Vec::new(),
+        }
+    }
+    pub fn get_type_id(&self) -> TypeId {
+        self.type_id
+    }
+    pub fn insert(&mut self, owning_entity: Id, component: T) -> Result<()> {
+        let orphan_component = self.orphans.pop();
+        match orphan_component {
+            Some(orphan) => {
+                //If we have an orphan component, transfer ownership to the new entity
+                self.transfer_ownership(orphan, owning_entity)?;
+            }
+            None => {
+                if self.components.contains_key(&owning_entity) {
+                    let hshmp = self.components.get_mut(&owning_entity).unwrap();
+                    let comp = Component::<T>::from(owning_entity, component);
+                    hshmp.insert(comp.get_id(), comp);
+                } else {
+                    let mut hshmp = HashMap::new();
+                    let component = Component::<T>::from(owning_entity, component);
+                    hshmp.insert(component.get_id(), component);
+                    self.components.insert(owning_entity, HashMap::new());
+                }
+            }
+        }
+        Ok(())
+    }
+
     //Marks this component as orphaned, and as a candiate to be reparented
     //It is the responsibility of the caller to ensure that the owning entity removes the component!
     pub fn orphan(&mut self, owning_entity: Id, component_id: ComponentId) -> Result<()> {
@@ -376,6 +443,8 @@ impl<T: ComponentTy + ComponentReqsTy> CommonComponentStore<T> {
         Ok(())
     }
 }
+
+//Stores all the component data in hashmaps indexed by the owning entity id
 pub struct Storage {
     //The bins of components. Points to a vector of components.
     bins: HashMap<std::any::TypeId, Box<dyn CommonComponentStoreTy>>,
@@ -388,7 +457,7 @@ impl Storage {
             component_infos: HashMap::new(),
         }
     }
-    pub fn insert_component<T: ComponentTy + ComponentReqsTy>(&mut self, entity: Id) -> Result<()> {
+    pub fn insert_default<T: ComponentTy + Default>(&mut self, entity: Id) -> Result<()> {
         let id = std::any::TypeId::of::<T>();
         match self.bins.contains_key(&id) {
             true => {
@@ -397,11 +466,31 @@ impl Storage {
                 let store = (store.as_mut())
                     .downcast_mut::<CommonComponentStore<T>>()
                     .unwrap();
-                store.insert(entity);
+                store.insert_default(entity);
             }
             false => {
                 let mut store = CommonComponentStore::<T>::new();
-                store.insert(entity);
+                store.insert_default(entity);
+                self.bins.insert(id, Box::new(store));
+            }
+        }
+
+        Ok(())
+    }
+    pub fn insert_component<T: ComponentTy>(&mut self, entity: Id, component: T) -> Result<()> {
+        let id = std::any::TypeId::of::<T>();
+        match self.bins.contains_key(&id) {
+            true => {
+                let mut store = self.bins.get_mut(&id).unwrap();
+                //downcast to the correct type
+                let store = (store.as_mut())
+                    .downcast_mut::<CommonComponentStore<T>>()
+                    .unwrap();
+                store.insert(entity, component);
+            }
+            false => {
+                let mut store = CommonComponentStore::<T>::new();
+                store.insert(entity, component);
                 self.bins.insert(id, Box::new(store));
             }
         }
@@ -509,23 +598,44 @@ impl Entman {
         }
     }
     pub fn add_entity(&mut self) -> Id {
-        todo!()
+        let ent = uuid::generate();
+        self.entities.insert(ent, Entity::new(ent));
+        ent
     }
-    pub fn remove_entity(&mut self, entity: Id) {
-        todo!()
+    //Removes the entity from the entity manager, and marks all it's components as orphaned.
+
+    pub fn remove_entity(&mut self, entity: Id) {}
+    //Adds a component to an entity
+    pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) -> Result<()> {
+        self.storage.insert_component::<T>(entity, component)?;
+        //add to entity signature
+        let ent = self.entities.get_mut(&entity).unwrap();
+        ent.add_component::<T>()?;
+        Ok(())
     }
-    pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
-        todo!()
+    //Adds a component to an entity, calling the default "constructor"
+    pub fn add_default<T: ComponentTy + Default>(&mut self, entity: Id) -> Result<()> {
+        self.storage.insert_default::<T>(entity)
     }
     pub fn add_archetype<T: archetypes::ArchetypeTy>(&mut self, archetype: T) {}
-    pub fn get_entity(&self, entity: Id) -> Option<bevy_ecs::world::EntityRef> {
-        todo!()
+    pub fn get_entity_ref(&self, entity: Id) -> Option<EntityRef> {
+        Some(EntityRef {
+            id: entity,
+            entman: self,
+        })
     }
-    pub fn get_entity_mut(&mut self, entity: Id) -> Option<bevy_ecs::world::EntityMut> {
-        todo!()
+    pub fn get_entity_mut(&mut self, entity: Id) -> Option<EntityRefMut> {
+        Some(EntityRefMut {
+            entity,
+            entman: self,
+        })
     }
     pub fn get_entity_count(&self) -> usize {
-        todo!()
+        self.entities.len()
+    }
+    //Can only be accessed internally
+    fn get_entity(&self, entity: Id) -> &Entity {
+        self.entities.get(&entity).unwrap()
     }
 }
 

@@ -1,20 +1,19 @@
-// use super::*;
-// use archetypes::*;
+use super::component::Field;
+use super::*;
+use archetypes::*;
 
-// #[test]
-// fn legion_add_component() {
-//     let mut em = EntityManager::new();
-//     let entity = em.add_entity();
-//     em.get_world_mut()
-//         .entry(entity)
-//         .unwrap()
-//         .add_component(("Hello"));
-//     assert_eq!(
-//         em.get_world_mut()
-//             .entry(entity)
-//             .unwrap()
-//             .get_component::<(&str)>()
-//             .unwrap(),
-//         ("Hello")
-//     )
-// }
+#[test]
+fn test_add_component() {
+    let mut em = Entman::new();
+    let entity = em.add_entity();
+    em.add_component(
+        entity,
+        Field {
+            name: "name".to_string(),
+            value: "value".to_string(),
+        },
+    );
+    em.add_default::<Field>(entity);
+    assert!(em.get_entity_ref(entity).unwrap().has_component::<Field>());
+
+}
