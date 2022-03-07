@@ -1,3 +1,5 @@
+pub mod relationship;
+
 use nvproc::Component;
 
 pub struct ArchetypeComponent {

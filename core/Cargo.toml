@@ -11,13 +11,12 @@ edition = "2021"
 [lib]
 test = true
 [dependencies]
-bitvec = "0.22.3"
 num = "0.4.0"
 nvproc = { path = "../procmacros" }
-getset = "0.1.2"
 utils = { version = "0.1.0", path = "../utils" }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 bevy_ecs = "0.6.1"
 dyn-clone = "1.0.4"
 anyhow = "1.0.54"
+petgraph = "0.6.0"

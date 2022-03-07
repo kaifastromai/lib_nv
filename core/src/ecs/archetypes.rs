@@ -25,11 +25,7 @@ macro_rules! signature {
 
 //An archetype is an entity that has a predefined set of components
 macro_rules! archetype {
-    ( $($signature:tt),* )=> {
-
-
-   
-    };
+    ( $($signature:tt),* ) => {};
 }
 pub struct ArchetypeDescriptor {
     pub components: Vec<TypeId>,
@@ -58,20 +54,25 @@ impl<T: ComponentTy> From<T> for SigType<T> {
     }
 }
 
-pub trait ArchetypeTy {
+pub trait ArchetypeTy<'a> {
     fn describe(&self) -> ArchetypeDescriptor;
+    fn consume(&self) -> Vec<&'a dyn ComponentTy>;
 }
-pub struct CharacterArchetype {
-    pub archetype_name: String,
-    pub name: String,
-    pub sex: String,
-    pub age: u32,
-    pub bio: String,
+pub struct CharacterArchetype<'a> {
+    archetype_name: String,
+    data: Vec<&'a dyn ComponentTy>,
 }
-impl ArchetypeTy for CharacterArchetype {
+impl<'a> ArchetypeTy<'a> for CharacterArchetype<'a> {
     fn describe(&self) -> ArchetypeDescriptor {
         let descriptor = ArchetypeDescriptor::new(signature!(Field, Field, Field, Field));
         descriptor
+    }
+    fn consume(&self) -> Vec<&'a dyn ComponentTy> {
+        let name=Field{name:String::from("name"),value:String::from("")};
+        let description=Field{name:String::from("description"),value:String::from("")};
+        let age=Field{name:String::from("age"),value:String::from("")};
+        let height=Field{name:String::from("height"),value:String::from("")};
+        self.data
     }
 }
 

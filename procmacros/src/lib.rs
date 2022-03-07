@@ -176,9 +176,37 @@ pub fn action_derive(input: TokenStream) -> TokenStream {
 pub fn component_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
+    let generics = &input.generics;
+    //remove default params for the generics
+    let mut impl_generics = generics.params.iter().map(|p| match p {
+        syn::GenericParam::Type(t) => syn::GenericParam::Type(syn::TypeParam {
+            default: None,
+            ..*t
+        })
+        .to_token_stream(),
+        syn::GenericParam::Const(c) => {
+            let o = syn::GenericParam::Const(syn::ConstParam {
+                default: None,
+                ..*c
+            });
+            quote! {#o}
+        }
+    });
+    let generic_type_names = generics.params.iter().map(|p| match p {
+        syn::GenericParam::Type(syn::TypeParam { ident, .. }) => ident.to_token_stream(),
+        syn::GenericParam::Lifetime(syn::LifetimeDef { lifetime, .. }) => {
+            quote! {#lifetime}
+        }
+        syn::GenericParam::Const(syn::ConstParam { ident, .. }) => quote! {#ident},
+    });
+
+    //check if component has generic parameters
+    if generics.params.is_empty() {
+        impl_generics = quote! {};
+    }
 
     let impl_block = quote! {
-        impl crate::ecs::ComponentTy for #name{
+        impl <#impl_generics> crate::ecs::ComponentTy for #name <#(#generic_type_names),*>{
           fn clean(&mut self){
              todo!()
           }
