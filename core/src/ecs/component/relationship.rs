@@ -1,10 +1,10 @@
 use super::super::*;
 use nvproc::Component;
 use petgraph::graph::*;
-pub enum RelationshipGradient<Major: RelationshipTy, Minor: RelationshipTy> {
-    Positive(Major, Minor),
-    Negative(Major, Minor),
-    Neutral(Major, Minor),
+pub enum RelationshipGradient {
+    Positive,
+    Negative,
+    Neutral,
 }
 
 // impl<const Name: &'static str, const P: &'static str, const N: &'static str> crate::ecs::ComponentTy
@@ -16,75 +16,56 @@ pub enum RelationshipGradient<Major: RelationshipTy, Minor: RelationshipTy> {
 // }
 //A generic relationship between two entities.
 
-pub trait RelationshipTy: 'static {
-    fn get_name() -> String {
-        std::any::type_name::<Self>().to_string()
-    }
-    fn get_relationship_name() -> String;
+pub enum ERelationship {
+    MajorMinor(Major, Minor),
+    Symmetric(Symmetric),
 }
-pub struct Father {}
-impl RelationshipTy for Father {
-    fn get_relationship_name() -> String {
-        "FatherChild".to_string()
+impl ERelationship {
+    fn parent_child(parent: Parent, child: Child) -> Self {
+        ERelationship::MajorMinor(Major::Parent(parent), Minor::Child(child))
     }
 }
-pub struct Mother {}
-
-impl RelationshipTy for Mother {
-    fn get_relationship_name() -> String {
-        "MotherChild".to_string()
-    }
+pub enum Major {
+    Parent(Parent),
 }
-pub struct Son {}
-impl RelationshipTy for Son {
-    fn get_relationship_name() -> String {
-        "SonParent".to_string()
-    }
+pub enum Minor {
+    Child(Child),
+    Custom(String),
+}
+pub enum Symmetric {
+    Friend,
+    Enemy,
+    Sibling,
+    Custom(String),
 }
 
-impl<Major: RelationshipTy, Minor: RelationshipTy> ecs::ComponentTy for Relationship<Major, Minor> {
-    fn clean(&mut self) {
-        todo!()
-    }
+pub enum Parent {
+    Mother,
+    Father,
+}
+pub enum Child {
+    Daughter,
+    Son,
+}
+pub enum Sibling {
+    Sister,
+    Brother,
+}
+pub enum Spouse {
+    Husband,
+    Wife,
 }
 
-pub struct Relationship<Major: RelationshipTy = Father, Minor: RelationshipTy = Son> {
+pub struct Relationship {
     pub relationship_name: String,
-    //The relationship's "direction"
-    pub gradient: RelationshipGradient<Major, Minor>,
+    pub relation: ERelationship,
     //The entities the relationship is between.
     pairs: (Id, Id),
-}
-impl<Major: RelationshipTy, Minor: RelationshipTy> Relationship<Major, Minor> {
-    pub fn new_static(pairs: (Id, Id), gradient: RelationshipGradient<Major, Minor>) -> Self {
-        Self {
-            relationship_name: Major::get_relationship_name(),
-            gradient: gradient,
-            pairs,
-        }
-    }
-    pub fn get_pairs(&self) -> (Id, Id) {
-        self.pairs
-    }
-    pub fn get_gradient(&self) -> RelationshipGradient<Major, Minor> {
-        self.gradient
-    }
 }
 
 pub struct RelationshipGraph {
     pub graph: DiGraph<Id, Relationship>,
 }
-pub struct Relation<T: RelationshipTy> {
-    phantom: std::marker::PhantomData<T>,
-}
-impl<T: RelationshipTy> From<&'static str> for Relation<T> {
-    fn from(name: &'static str) -> Self {
-        Self {
-            phantom: std::marker::PhantomData,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test_relationship {
     use super::*;
@@ -98,16 +79,26 @@ mod test_relationship {
         let ent2 = uuid::generate();
         let ent3 = uuid::generate();
         let father = Relationship {
-            relationship_name: "FatherSon",
-            gradient: RelationshipGradient::Positive("Father", "Son"),
+            relationship_name: "FatherSon".to_string(),
+            relation: ERelationship::parent_child(Parent::Father, Child::Son),
             pairs: (ent1, ent2),
         };
-        let mother = Relationship::new_static(
-            (ent1, ent2),
-            RelationshipGradient::Positive("Mother", "Son"),
-        );
+        let m = Parent::Mother;
+        let mother = Relationship {
+            relationship_name: "MotherSon".to_string(),
+            relation: ERelationship::parent_child(Parent::Mother, Child::Son),
 
-        graph.graph.add_edge(ent1, ent2, father);
-        graph.graph.add_edge(ent3, ent2, mother);
+            pairs: (ent1, ent3),
+        };
+
+        //create nodes
+        let n1 = graph.graph.add_node(ent1);
+        let n2 = graph.graph.add_node(ent2);
+        let n3 = graph.graph.add_node(ent3);
+
+        graph.graph.add_edge(n1, n2, father);
+        graph.graph.add_edge(n3, n2, mother);
+        
+
     }
 }

@@ -45,6 +45,7 @@ impl Mir {
     pub fn create_project(&mut self, name: String, desc: String) {
         self.data.proj.name = name;
         self.data.proj.description = desc;
+        
     }
     pub fn get_entity_count(&self) -> usize {
         self.data.em.get_entity_count()
