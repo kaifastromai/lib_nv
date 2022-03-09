@@ -617,7 +617,7 @@ impl Entman {
     pub fn add_default<T: ComponentTy + Default>(&mut self, entity: Id) -> Result<()> {
         self.storage.insert_default::<T>(entity)
     }
-    pub fn add_archetype<T: archetypes::ArchetypeTy>(&mut self, archetype: T) {}
+    pub fn add_archetype<'a, T: archetypes::ArchetypeTy<'a>>(&mut self, archetype: T) {}
     pub fn get_entity_ref(&self, entity: Id) -> Option<EntityRef> {
         Some(EntityRef {
             id: entity,

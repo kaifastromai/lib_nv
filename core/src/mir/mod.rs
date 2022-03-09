@@ -38,7 +38,7 @@ impl Mir {
     pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
         self.data.em.add_component(entity, component);
     }
-    pub fn add_archetype<T: archetypes::ArchetypeTy>(&mut self, entity: Id, archetype: T) {
+    pub fn add_archetype<'a, T: archetypes::ArchetypeTy<'a>>(&mut self, entity: Id, archetype: T) {
         todo!()
     }
 

@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
+#![feature(const_generics_defaults)]
 
 use std::collections::HashMap;
 

@@ -178,20 +178,24 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
     let name = input.ident;
     let generics = &input.generics;
     //remove default params for the generics
-    let mut impl_generics = generics.params.iter().map(|p| match p {
-        syn::GenericParam::Type(t) => syn::GenericParam::Type(syn::TypeParam {
-            default: None,
-            ..*t
-        })
-        .to_token_stream(),
-        syn::GenericParam::Const(c) => {
-            let o = syn::GenericParam::Const(syn::ConstParam {
+    let mut impl_generics = generics
+        .params
+        .iter()
+        .map(|p| match p {
+            syn::GenericParam::Type(t) => syn::GenericParam::Type(syn::TypeParam {
                 default: None,
-                ..*c
-            });
-            quote! {#o}
-        }
-    });
+                ..t.clone()
+            })
+            .to_token_stream(),
+            syn::GenericParam::Const(c) => syn::GenericParam::Const(syn::ConstParam {
+                default: None,
+                ..c.clone()
+            })
+            .to_token_stream(),
+            syn::GenericParam::Lifetime(_) => todo!(),
+        })
+        .collect::<Vec<_>>();
+
     let generic_type_names = generics.params.iter().map(|p| match p {
         syn::GenericParam::Type(syn::TypeParam { ident, .. }) => ident.to_token_stream(),
         syn::GenericParam::Lifetime(syn::LifetimeDef { lifetime, .. }) => {
@@ -202,15 +206,16 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
 
     //check if component has generic parameters
     if generics.params.is_empty() {
-        impl_generics = quote! {};
+        impl_generics = vec![quote! {}];
     }
-
     let impl_block = quote! {
-        impl <#impl_generics> crate::ecs::ComponentTy for #name <#(#generic_type_names),*>{
+        impl <#(#impl_generics),*> crate::ecs::ComponentTy for #name <# (#generic_type_names),*>{
           fn clean(&mut self){
              todo!()
           }
         }
+
+
     };
     impl_block.into()
 }
