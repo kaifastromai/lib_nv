@@ -8,4 +8,8 @@ class Context {
   Context();
   void sayHello();
 };
+
+Context::Context() { ctx_ = new_ctx(); };
+void Context::sayHello() { std::cout << "Hello from C++" << std::endl; }
+
 }  // namespace nv

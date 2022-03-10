@@ -1,15 +1,33 @@
-cmake_minimum_required(VERSION 3.20.0)
-project(nv_api VERSION 0.1.0)
-include(CTest)
-enable_testing()
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-enable_language(Rust)
-include(CMakeCargo)
-cargo_build(NAME nv_api)
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/nv_api/include/)
-#link with pthread 
-target_link_libraries(${PROJECT_NAME} INTERFACE pthread dl)
 
-set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-include(CPack)
+cmake_policy(SET CMP0048 NEW)
+cmake_policy(SET CMP0003 NEW)
+cmake_minimum_required(VERSION 3.20)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CARGO_CMD cargo build --verbose)
+    set(TARGET_DIR "debug")
+else ()
+    set(CARGO_CMD cargo build --release --verbose)
+    set(TARGET_DIR "release")
+endif ()
+
+if(ENABLE_LTO)
+    set(RUST_FLAGS "-Clinker-plugin-lto" "-Clinker=clang-13" "-Clink-arg=-fuse-ld=lld-13")
+endif()
+
+set(RUST_PART_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libnv_api.a")
+
+set(NV_CXX "${CMAKE_CURRENT_BINARY_DIR}/nv_api.cc")
+add_library(nv_api STATIC ${NV_CXX})
+add_custom_command(
+    OUTPUT ${NV_CXX}
+    COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/nv_api/cxxbridge/nv_api/src/lib.rs.cc ${NV_CXX}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/nv_api/cxxbridge/nv_api/src/lib.rs.h ${CMAKE_CURRENT_BINARY_DIR}/nv_api.h
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(nv_api pthread dl ${RUST_PART_LIB})
+
+add_test(NAME nv_api_test 
+    COMMAND cargo test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
