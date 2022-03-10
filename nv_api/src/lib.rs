@@ -13,6 +13,5 @@ mod ffi {
     extern "Rust" {
         type ContextInternal;
         pub fn new_ctx() -> *mut ContextInternal;
-        pub fn say_hello();
     }
 }

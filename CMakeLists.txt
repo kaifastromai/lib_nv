@@ -14,8 +14,9 @@ if(ENABLE_LTO)
     set(RUST_FLAGS "-Clinker-plugin-lto" "-Clinker=clang-13" "-Clink-arg=-fuse-ld=lld-13")
 endif()
 
-set(RUST_PART_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libnv_api.a")
+set(NV_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libnv_api.a")
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include)
 set(NV_CXX "${CMAKE_CURRENT_BINARY_DIR}/nv_api.cc")
 add_library(nv_api STATIC ${NV_CXX})
 add_custom_command(
@@ -26,7 +27,8 @@ add_custom_command(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(nv_api pthread dl ${RUST_PART_LIB})
+
+target_link_libraries(nv_api pthread dl ${NV_LIB})
 
 add_test(NAME nv_api_test 
     COMMAND cargo test
