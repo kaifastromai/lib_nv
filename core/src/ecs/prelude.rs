@@ -1,1 +1,1 @@
-pub use crate::ecs::{Entman};
+pub use crate::ecs::Entman;

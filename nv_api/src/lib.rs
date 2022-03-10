@@ -1,25 +1,14 @@
 use nvcore::mir::Mir;
 use std::ffi::c_void;
 
-#[repr(C)]
-//Context holds the current state of the kernel. It must be exposed to the C API.
-pub struct Context {
-    //Raw ptr to the Mir struct.
-    pub mir: *mut Mir,
+#[no_mangle]
+pub extern "C" fn create_mir() -> *mut Mir {
+    let mir = Mir::new();
+    Box::into_raw(Box::new(mir))
 }
-
-//implement context
-impl Context {
-    #[no_mangle]
-    pub extern "C" fn create() -> Self {
-        Context {
-            mir: Box::into_raw(Box::new(Mir::new())),
-        }
-    }
-    #[no_mangle]
-    pub extern "C" fn destroy(ctx: &mut Self) {
-        unsafe {
-            Box::from_raw(ctx.mir);
-        }
-    }
+/// # Safety
+/// There should be no other references to the mir at this point!
+#[no_mangle]
+pub unsafe extern "C" fn free_mir(mir: *mut Mir) {
+    Box::from_raw(mir);
 }

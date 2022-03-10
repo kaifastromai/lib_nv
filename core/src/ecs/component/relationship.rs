@@ -1,21 +1,7 @@
 use super::super::*;
 use nvproc::Component;
 use petgraph::graph::*;
-pub enum RelationshipGradient {
-    Positive,
-    Negative,
-    Neutral,
-}
-
-// impl<const Name: &'static str, const P: &'static str, const N: &'static str> crate::ecs::ComponentTy
-//     for Relationship<Name, P, N>
-// {
-//     fn clean(&mut self) {
-//         todo!()
-//     }
-// }
-//A generic relationship between two entities.
-
+use petgraph::visit::*;
 pub enum ERelationship {
     MajorMinor(Major, Minor),
     Symmetric(Symmetric),
@@ -27,16 +13,21 @@ impl ERelationship {
 }
 pub enum Major {
     Parent(Parent),
+    Custom(Custom),
+}
+pub struct Custom {
+    pub name: String,
+    pub description: String,
 }
 pub enum Minor {
     Child(Child),
-    Custom(String),
+    Custom(Custom),
 }
 pub enum Symmetric {
     Friend,
     Enemy,
     Sibling,
-    Custom(String),
+    Custom(Custom),
 }
 
 pub enum Parent {
@@ -62,9 +53,44 @@ pub struct Relationship {
     //The entities the relationship is between.
     pairs: (Id, Id),
 }
-
+impl Relationship {
+    pub fn new(name: String, relation: ERelationship, pairs: (Id, Id)) -> Self {
+        Relationship {
+            relationship_name: name,
+            relation,
+            pairs,
+        }
+    }
+    pub fn get_name(&self) -> &str {
+        &self.relationship_name
+    }
+    pub fn get_relation(&self) -> &ERelationship {
+        &self.relation
+    }
+    pub fn get_major_pair(&self) -> Id {
+        self.pairs.0
+    }
+    pub fn get_minor_pair(&self) -> Id {
+        self.pairs.1
+    }
+}
 pub struct RelationshipGraph {
     pub graph: DiGraph<Id, Relationship>,
+}
+impl RelationshipGraph {
+    pub fn new() -> Self {
+        RelationshipGraph {
+            graph: DiGraph::new(),
+        }
+    }
+    pub fn find_node_index(&self, id: Id) -> Option<NodeIndex<u32>> {
+        for (i, n) in self.graph.node_weights().enumerate() {
+            if *n == id {
+                return Some(NodeIndex::new(i.into()));
+            }
+        }
+        None
+    }
 }
 #[cfg(test)]
 mod test_relationship {
@@ -72,7 +98,7 @@ mod test_relationship {
 
     #[test]
     fn test_basic() {
-        let graph = RelationshipGraph {
+        let mut graph = RelationshipGraph {
             graph: DiGraph::new(),
         };
         let ent1 = uuid::generate();
@@ -98,7 +124,5 @@ mod test_relationship {
 
         graph.graph.add_edge(n1, n2, father);
         graph.graph.add_edge(n3, n2, mother);
-        
-
     }
 }

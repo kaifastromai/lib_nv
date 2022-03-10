@@ -8,15 +8,13 @@
 
 namespace nv_internal {
 
-struct Context {
-  Mir *mir;
-};
-
 extern "C" {
 
-Context create();
+Mir *create_mir();
 
-void destroy(Context *ctx);
+/// # Safety
+/// There should be no other references to the mir at this point!
+void free_mir(Mir *mir);
 
 } // extern "C"
 

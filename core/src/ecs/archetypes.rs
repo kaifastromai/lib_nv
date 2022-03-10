@@ -56,7 +56,7 @@ impl<T: ComponentTy> From<T> for SigType<T> {
 
 pub trait ArchetypeTy<'a> {
     fn describe(&self) -> ArchetypeDescriptor;
-    fn consume(&self) -> Vec<&'a dyn ComponentTy>;
+    fn consume(self) -> Vec<&'a dyn ComponentTy>;
 }
 pub struct CharacterArchetype<'a> {
     archetype_name: String,
@@ -67,11 +67,23 @@ impl<'a> ArchetypeTy<'a> for CharacterArchetype<'a> {
         let descriptor = ArchetypeDescriptor::new(signature!(Field, Field, Field, Field));
         descriptor
     }
-    fn consume(&self) -> Vec<&'a dyn ComponentTy> {
-        let name=Field{name:String::from("name"),value:String::from("")};
-        let description=Field{name:String::from("description"),value:String::from("")};
-        let age=Field{name:String::from("age"),value:String::from("")};
-        let height=Field{name:String::from("height"),value:String::from("")};
+    fn consume(self) -> Vec<&'a dyn ComponentTy> {
+        let name = Field {
+            name: String::from("name"),
+            value: String::from(""),
+        };
+        let description = Field {
+            name: String::from("description"),
+            value: String::from(""),
+        };
+        let age = Field {
+            name: String::from("age"),
+            value: String::from(""),
+        };
+        let height = Field {
+            name: String::from("height"),
+            value: String::from(""),
+        };
         self.data
     }
 }

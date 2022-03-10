@@ -13,6 +13,7 @@ pub struct MirData {
     pub em: Entman,
     pub proj: Project,
 }
+#[repr(C)]
 pub struct Mir {
     pub data: MirData,
 }
@@ -22,11 +23,7 @@ impl Mir {
             em: Entman::new(),
             proj: Project::new_empty(),
         };
-        let mut m = Mir {
-            data,
-            reqman: None,
-            actman: None,
-        };
+        let mut m = Mir { data };
         // m.actman = Some(Actman::new(&mut m.data));
         // m.reqman = Some(Reqman::new(&mut m.data));
         m
@@ -43,9 +40,8 @@ impl Mir {
     }
 
     pub fn create_project(&mut self, name: String, desc: String) {
-        self.data.proj.name = name;
+        self.data.proj.project_meta_data.name = name;
         self.data.proj.description = desc;
-        
     }
     pub fn get_entity_count(&self) -> usize {
         self.data.em.get_entity_count()
