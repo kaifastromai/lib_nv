@@ -6,7 +6,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 enable_language(Rust)
 include(CMakeCargo)
 cargo_build(NAME nv_api)
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/c_api/include/)
+target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/nv_api/include/)
 #link with pthread 
 target_link_libraries(${PROJECT_NAME} INTERFACE pthread dl)
 

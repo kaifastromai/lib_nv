@@ -1,14 +1,15 @@
 use nvcore::mir::Mir;
-use std::ffi::c_void;
 
-#[no_mangle]
-pub extern "C" fn create_mir() -> *mut Mir {
-    let mir = Mir::new();
-    Box::into_raw(Box::new(mir))
+pub struct ContextInternal {
+    pub mir: Mir,
 }
-/// # Safety
-/// There should be no other references to the mir at this point!
-#[no_mangle]
-pub unsafe extern "C" fn free_mir(mir: *mut Mir) {
-    Box::from_raw(mir);
+pub fn new_ctx() -> *mut ContextInternal {
+    Box::into_raw(Box::new(ContextInternal { mir: Mir::new() }))
+}
+#[cxx::bridge]
+mod ffi {
+    extern "Rust" {
+        type ContextInternal;
+        pub fn new_ctx() -> *mut ContextInternal;
+    }
 }

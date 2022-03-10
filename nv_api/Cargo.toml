@@ -12,6 +12,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 nvcore = { path = "../core" }
+cxx = "*"
 
 [build-dependencies]
-cbindgen = "0.20.0"
+cxx-build = "*"
