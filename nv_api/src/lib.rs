@@ -62,12 +62,7 @@ mod ffi {
         pub fn new_ctx() -> *mut ContextInternal;
         pub fn create_project(&mut self, name: String, desc: String);
         pub fn add_entity(&mut self) -> Id;
-        pub fn add_field_component(
-            &mut self,
-            entity: String,
-            field_name: String,
-            field_value: String,
-        );
+        pub fn add_field_component(&mut self, entity: Id, field_name: String, field_value: String);
         pub fn to_string(self: &Id) -> String;
 
     }
