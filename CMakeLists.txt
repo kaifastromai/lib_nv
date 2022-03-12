@@ -2,6 +2,7 @@
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0003 NEW)
 cmake_minimum_required(VERSION 3.20)
+set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CARGO_CMD cargo build --verbose)
     set(TARGET_DIR "debug")
@@ -22,8 +23,8 @@ add_library(nv_api STATIC ${NV_CXX})
 add_custom_command(
     OUTPUT ${NV_CXX}
     COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/nv_api/cxxbridge/nv_api/src/lib.rs.cc ${NV_CXX}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/nv_api/cxxbridge/nv_api/src/lib.rs.h ${CMAKE_CURRENT_BINARY_DIR}/nv_api.h
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/lib.rs.cc ${NV_CXX}
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/lib.rs.h ${CMAKE_CURRENT_BINARY_DIR}/nv_api.h
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
