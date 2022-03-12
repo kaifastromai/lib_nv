@@ -17,20 +17,26 @@ endif()
 
 set(NV_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libnv_api.a")
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include)
-set(NV_CXX "${CMAKE_CURRENT_BINARY_DIR}/nv_api.cc")
+include_directories(${CMAKE_BINARY_SOURCE_DIR}/nv_api/include)
+set(NV_CXX "${CMAKE_CURRENT_BINARY_DIR}/nv_api/lib.rs.cc")
+add_custom_command(
+    OUTPUT ${NV_LIB}
+    COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD}
+)
 add_library(nv_api STATIC ${NV_CXX})
 add_custom_command(
     OUTPUT ${NV_CXX}
     COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/lib.rs.cc ${NV_CXX}
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/lib.rs.h ${CMAKE_CURRENT_BINARY_DIR}/nv_api.h
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/nv_api
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/*.cc ${CMAKE_CURRENT_BINARY_DIR}/nv_api/
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/*.h ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/
+   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/nv_api.h  ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/src/lib.rs
 )
-
-
-target_link_libraries(nv_api pthread dl ${NV_LIB})
+target_link_libraries(nv_api pthread dl ${NV_LIB} )
+target_include_directories(nv_api PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/ ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/rust/)
 
 add_test(NAME nv_api_test 
     COMMAND cargo test
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(test test.cpp)
+target_link_libraries(test nv_api)
