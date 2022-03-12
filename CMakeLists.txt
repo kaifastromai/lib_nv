@@ -27,6 +27,8 @@ add_custom_command(
     OUTPUT ${NV_LIB}
     COMMAND CARGO_TARGET_DIR=${CMAKE_CURRENT_BINARY_DIR} RUSTFLAGS="${RUST_FLAGS}" ${CARGO_CMD}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/nv_api.h  ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/src/lib.rs
+
 )
 add_custom_target(nv_api_target DEPENDS ${NV_CXX})
 add_library(nv_api STATIC ${NV_CXX})
@@ -44,5 +46,5 @@ target_include_directories(nv_api PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/incl
 add_test(NAME nv_api_test 
     COMMAND cargo test
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-# add_executable(test test.cpp)
-# target_link_libraries(test nv_api)
+add_executable(test test.cpp)
+target_link_libraries(test nv_api)

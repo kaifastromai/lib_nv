@@ -3,6 +3,9 @@
     "lldb.dereferencePointers": true,
     "lldb.displayFormat": "auto",
     "files.associations": {
-        "new": "cpp"
+        "new": "cpp",
+        "bitset": "cpp",
+        "system_error": "cpp",
+        "typeinfo": "cpp"
     }
 }

@@ -41,6 +41,24 @@ pub struct Image {
     description: String,
     image_data: PathBuf,
 }
+
+#[derive(Component, Default)]
+pub struct Name {
+    pub name: String,
+    pub aliases: Vec<String>,
+}
+#[derive(Default)]
+pub struct CharacterNameFormat {
+    pub given_name: String,
+    pub other_names: Vec<String>,
+    pub family_name: String,
+}
+
+#[derive(Component, Default)]
+pub struct CharacterName {
+    pub name: CharacterNameFormat,
+    pub aliases: Vec<String>,
+}
 #[derive(Component, Default)]
 pub struct BinaryDatum {
     data: PathBuf,

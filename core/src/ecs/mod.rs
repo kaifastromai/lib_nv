@@ -13,6 +13,7 @@ use std::{
 };
 
 pub type Id = u128;
+
 //A component type. It's id corrosponds to the entity it belongs to.
 pub trait ComponentTy: Any {
     fn get_type_id(&self) -> TypeId {

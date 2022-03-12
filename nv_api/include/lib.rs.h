@@ -159,15 +159,32 @@ std::size_t align_of() {
 } // namespace rust
 
 namespace nvr {
+  struct Id;
   struct ContextInternal;
 }
 
 namespace nvr {
+#ifndef CXXBRIDGE1_STRUCT_nvr$Id
+#define CXXBRIDGE1_STRUCT_nvr$Id
+struct Id final {
+  ::std::array<::std::uint8_t, 16> id;
+
+  ::rust::String to_string() const noexcept;
+  bool operator==(const Id &) const noexcept;
+  bool operator!=(const Id &) const noexcept;
+  bool operator<(const Id &) const noexcept;
+  bool operator<=(const Id &) const noexcept;
+  bool operator>(const Id &) const noexcept;
+  bool operator>=(const Id &) const noexcept;
+  using IsRelocatable = ::std::true_type;
+};
+#endif // CXXBRIDGE1_STRUCT_nvr$Id
+
 #ifndef CXXBRIDGE1_STRUCT_nvr$ContextInternal
 #define CXXBRIDGE1_STRUCT_nvr$ContextInternal
 struct ContextInternal final : public ::rust::Opaque {
   void create_project(::rust::String name, ::rust::String desc) noexcept;
-  ::rust::String add_entity() noexcept;
+  ::nvr::Id add_entity() noexcept;
   void add_field_component(::rust::String entity, ::rust::String field_name, ::rust::String field_value) noexcept;
   ~ContextInternal() = delete;
 
