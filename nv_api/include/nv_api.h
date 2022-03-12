@@ -2,19 +2,23 @@
 #include <lib.rs.h>
 
 #include <iostream>
+#include <string>
 namespace nv {
 class Context {
-  ContextInternal *ctx_;
+  nvr::ContextInternal *ctx_;
 
  public:
   Context();
-  void sayHello();
-  void say_hello_rust();
+  std::string AddEntity();
+  void AddComponentField(std::string entity, std::string field_name,
+                         std::string field_value);
 };
 
-Context::Context() { ctx_ = new_ctx(); };
-void Context::sayHello() { std::cout << "Hello C++" << std::endl; }
-
-void Context::say_hello_rust() { say_hello(); }
+Context::Context() { ctx_ = nvr::new_ctx(); };
+void Context::AddComponentField(std::string entity, std::string field_name,
+                                std::string field_value) {
+  ctx_->add_field_component(entity, field_name, field_value);
+}
+std::string Context::AddEntity() { return ctx_->add_entity(); }
 
 }  // namespace nv

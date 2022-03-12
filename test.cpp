@@ -4,8 +4,7 @@
 #include <string>
 int main() {
   nv::Context ctx;
-  ctx.sayHello();
-  ctx.say_hello_rust();
+  auto id = ctx.AddEntity();
   std::cout << "Hello C++" << std::endl;
   return 0;
 }

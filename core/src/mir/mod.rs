@@ -29,8 +29,8 @@ impl Mir {
         m
     }
     //adds an entity
-    pub fn add_entity(&mut self, class: String) -> Id {
-        todo!()
+    pub fn add_entity(&mut self) -> Id {
+        self.data.em.add_entity()
     }
     pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
         self.data.em.add_component(entity, component);

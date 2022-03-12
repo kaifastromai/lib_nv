@@ -2,12 +2,16 @@
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0003 NEW)
 cmake_minimum_required(VERSION 3.20)
+#Hard coded, terrible idea
+find_program(CARGO cargo PATH $ENV{HOME}/.cargo/bin)
+#message the current environment path
+message(STATUS "Current path: $ENV{PATH}")
 set(CMAKE_CXX_STANDARD 17)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CARGO_CMD cargo build --verbose)
+    set(CARGO_CMD ${CARGO} build --verbose)
     set(TARGET_DIR "debug")
 else ()
-    set(CARGO_CMD cargo build --release --verbose)
+    set(CARGO_CMD ${CARGO} build --release --verbose)
     set(TARGET_DIR "release")
 endif ()
 
