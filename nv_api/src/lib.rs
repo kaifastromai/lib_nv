@@ -55,6 +55,53 @@ mod ffi {
     struct Id {
         id: [u8; 16],
     }
+
+    #[namespace = "components"]
+    pub struct Field {
+        pub name: String,
+        pub value: String,
+    }
+
+    #[namespace = "components"]
+    pub struct Video {
+        description: String,
+        video_name: String,
+        video_type: String,
+        video_data: String,
+    }
+    #[namespace = "components"]
+    pub struct Audio {
+        description: String,
+        audio_name: String,
+        audio_type: String,
+        audio_data: String,
+    }
+
+    #[namespace = "components"]
+    pub struct Image {
+        name: String,
+        description: String,
+        image_data: String,
+    }
+
+    #[namespace = "components"]
+
+    pub struct Name {
+        pub name: String,
+        pub aliases: Vec<String>,
+    }
+    #[namespace = "components"]
+    pub struct CharacterNameFormat {
+        pub given_name: String,
+        pub other_names: Vec<String>,
+        pub family_name: String,
+    }
+    #[namespace = "components"]
+    pub struct CharacterName {
+        pub name: CharacterNameFormat,
+        pub aliases: Vec<String>,
+    }
+
     #[namespace = "nvr"]
     extern "Rust" {
         type ContextInternal;

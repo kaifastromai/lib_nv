@@ -11,10 +11,7 @@ pub struct ArchetypeComponent {
 pub trait BinaryTy {
     fn to_bytes(&self) -> Vec<u8>;
 }
-#[derive(Component)]
-pub struct BinaryData {
-    pub data: Vec<Box<dyn BinaryTy + Send + Sync>>,
-}
+
 #[derive(Component, Default)]
 pub struct Field {
     pub name: String,

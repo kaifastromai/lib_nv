@@ -5,23 +5,20 @@
 #include <string>
 namespace nv {
 
+class IComponent {};
+// The current instance of novella
 class Context {
   nvr::ContextInternal *ctx_;
+  components::Field *field_;
 
  public:
-  Context();
-  nvr::Id AddEntity();
-  void AddComponentField(std::string entity, std::string field_name,
-                         std::string field_value);
+  Context() { ctx_ = nvr::new_ctx(); }
+  //Add a new entity. Returns the id of the entity.
+  nvr::Id AddEntity() { return ctx_->add_entity(); }
+  //Add a field component to an entity.
+  void AddComponentField(nvr::Id entity, std::string field_name,
+                         std::string field_value) {
+    ctx_->add_field_component(entity, field_name, field_value);
+  }
 };
-
-Context::Context() { ctx_ = nvr::new_ctx(); };
-
-void Context::AddComponentField(std::string entity, std::string field_name,
-                                std::string field_value) {
-  ctx_->add_field_component(entity, field_name, field_value);
-}
-nvr::Id Context::AddEntity() { return ctx_->add_entity(); 
-}
-
 }  // namespace nv
