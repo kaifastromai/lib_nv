@@ -19,7 +19,9 @@ if(ENABLE_LTO)
     set(RUST_FLAGS "-Clinker-plugin-lto" "-Clinker=clang-13" "-Clink-arg=-fuse-ld=lld-13")
 endif()
 
-set(NV_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libnv_api.a")
+
+
+set(NV_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}nv_api${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
 include_directories(${CMAKE_BINARY_SOURCE_DIR}/nv_api/include)
 set(NV_CXX "${CMAKE_CURRENT_BINARY_DIR}/nv_api/lib.rs.cc")
