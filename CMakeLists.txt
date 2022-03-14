@@ -46,10 +46,11 @@ add_custom_command(
 #check if we're on windows
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     #if we are, add the nv_api.lib to the linker
-    add_library(nv_api ${NV_LIB})
     target_link_libraries(nv_api ${NV_LIB})
+else()
+        target_link_libraries(nv_api pthread dl ${NV_LIB})
 endif()
-    target_link_libraries(nv_api pthread dl ${NV_LIB})
+  
 target_include_directories(nv_api PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/ ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/rust/)
 
 add_test(NAME nv_api_test 
