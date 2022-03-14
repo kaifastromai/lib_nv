@@ -37,7 +37,7 @@ add_custom_target(nv_api_target DEPENDS ${NV_CXX})
 add_library(nv_api STATIC ${NV_CXX})
 add_custom_command(
     OUTPUT ${NV_CXX}
-    COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/nv_api
+    COMMAND ${CMAKE_COMMAND} -E make_directory -p ${CMAKE_CURRENT_BINARY_DIR}/nv_api
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/*.cc ${CMAKE_CURRENT_BINARY_DIR}/nv_api/
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/*.h ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/
    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/nv_api.h  ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/src/lib.rs ${NV_LIB}
