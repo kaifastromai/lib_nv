@@ -48,7 +48,7 @@ add_custom_command(
 #check if we're on windows
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     #if we are, add the nv_api.lib to the linker
-    target_link_libraries(nv_api ${NV_LIB})
+    target_link_libraries(nv_api ${NV_LIB} ws2_32 userenv)
 else()
         target_link_libraries(nv_api pthread dl ${NV_LIB})
 endif()
