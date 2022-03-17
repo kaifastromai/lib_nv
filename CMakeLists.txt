@@ -42,7 +42,7 @@ add_custom_command(
     OUTPUT ${NV_CXX}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/lib.rs.cc ${CMAKE_CURRENT_BINARY_DIR}/nv_api/
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/nv_api/src/lib.rs.h ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/
-   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/include/nv_api.h  ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/src/lib.rs ${NV_LIB}
+   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nv_api/src/lib.rs ${NV_LIB}
  
 )
 #check if we're on windows

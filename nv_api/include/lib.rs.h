@@ -833,6 +833,7 @@ struct ContextInternal final : public ::rust::Opaque {
   void create_project(::rust::String name, ::rust::String desc) noexcept;
   ::nvr::Id add_entity() noexcept;
   void add_field_component(::nvr::Id entity, ::rust::String field_name, ::rust::String field_value) noexcept;
+  ::rust::Vec<::nvr::Id> get_all_living_entities() const noexcept;
   ~ContextInternal() = delete;
 
 private:
@@ -845,4 +846,6 @@ private:
 #endif // CXXBRIDGE1_STRUCT_nvr$ContextInternal
 
 ::nvr::ContextInternal *new_ctx() noexcept;
+
+void drop(::nvr::ContextInternal *ctx) noexcept;
 } // namespace nvr

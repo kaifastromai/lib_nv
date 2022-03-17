@@ -37,6 +37,11 @@ impl ContextInternal {
 pub fn new_ctx() -> *mut ContextInternal {
     Box::into_raw(Box::new(ContextInternal { mir: Mir::new() }))
 }
+//Safety
+//There should be only reference to the context
+pub unsafe fn drop(ctx: *mut ContextInternal) {
+    Box::from_raw(ctx);
+}
 impl ffi::Id {
     fn from_internal_id(id: Id) -> Self {
         let mem = id.to_be_bytes();
@@ -122,6 +127,7 @@ mod ffi {
         pub fn add_field_component(&mut self, entity: Id, field_name: String, field_value: String);
         pub fn to_string(self: &Id) -> String;
         pub fn get_all_living_entities(&self) -> Vec<Id>;
+        pub unsafe fn drop(ctx: *mut ContextInternal);
 
     }
 }
