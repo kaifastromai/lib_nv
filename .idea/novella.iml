@@ -33,6 +33,20 @@
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/proc-macro-error-10db513f332ec6fa/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/proc-macro-error-attr-d628d81d11cffb47/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/csl/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/nv_api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/ahash-3c5227af47728446/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/anyhow-6ad63d534a9c6bbb/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/cxx-862dabc2f4b49cc6/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/erased-serde-bcd3c1a22b023e21/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/indexmap-588bba3a14f7aae2/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/link-cplusplus-9f3badb9e81b8ba7/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/nv_api-f3dd0fb051f7c31e/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/parking_lot_core-bf6ff6a223429f15/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/proc-macro2-6110cdd24300b8d4/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/scratch-708f6ed8b4b3a7ee/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde-6eaed104c44eabfd/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde_derive-4f01dccc47c4df20/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde_json-240bab5140dd2e8c/out" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

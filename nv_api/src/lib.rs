@@ -1,4 +1,7 @@
-use nvcore::{ecs::Id, mir::Mir};
+use nvcore::{
+    ecs::{Entity, Id},
+    mir::Mir,
+};
 
 pub struct ContextInternal {
     pub mir: Mir,

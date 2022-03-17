@@ -46,4 +46,7 @@ impl Mir {
     pub fn get_entity_count(&self) -> usize {
         self.data.em.get_entity_count()
     }
+    pub fn get_entity(&self, id: Id) -> Entity {
+        self.data.em.get_entity_clone(id)
+    }
 }

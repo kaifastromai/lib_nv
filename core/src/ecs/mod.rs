@@ -66,6 +66,7 @@ impl Ord for EntityComponent {
         self.count.cmp(&other.count)
     }
 }
+#[derive(Debug, Clone)]
 pub struct Entity {
     id: Id,
     is_alive: bool,
@@ -637,6 +638,10 @@ impl Entman {
     //Can only be accessed internally
     fn get_entity(&self, entity: Id) -> &Entity {
         self.entities.get(&entity).unwrap()
+    }
+    pub fn get_entity_clone(&self, entity: Id) -> Entity {
+        let e = self.entities.get(&entity).unwrap();
+        e.clone()
     }
 }
 
