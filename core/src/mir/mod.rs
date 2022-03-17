@@ -49,4 +49,7 @@ impl Mir {
     pub fn get_entity(&self, id: Id) -> Entity {
         self.data.em.get_entity_clone(id)
     }
+    pub fn get_all_living_entities(&self) -> Vec<Id> {
+        self.data.em.get_all_living_entities()
+    }
 }

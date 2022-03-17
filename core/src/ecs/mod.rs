@@ -643,6 +643,15 @@ impl Entman {
         let e = self.entities.get(&entity).unwrap();
         e.clone()
     }
+    pub fn get_all_living_entities(&self) -> Vec<Id> {
+        self.entities
+            .iter()
+            .filter_map(|(_, e)| match e.is_valid() {
+                true => Some(e.id),
+                false => None,
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

@@ -26,6 +26,13 @@ impl ContextInternal {
         };
         self.mir.add_component(entity.into(), field_comp)
     }
+    pub fn get_all_living_entities(&self) -> Vec<ffi::Id> {
+        self.mir
+            .get_all_living_entities()
+            .iter()
+            .map(|id| ffi::Id::from_internal_id(*id))
+            .collect()
+    }
 }
 pub fn new_ctx() -> *mut ContextInternal {
     Box::into_raw(Box::new(ContextInternal { mir: Mir::new() }))
@@ -114,6 +121,7 @@ mod ffi {
         pub fn add_entity(&mut self) -> Id;
         pub fn add_field_component(&mut self, entity: Id, field_name: String, field_value: String);
         pub fn to_string(self: &Id) -> String;
+        pub fn get_all_living_entities(&self) -> Vec<Id>;
 
     }
 }
