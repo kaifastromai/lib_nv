@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#pragma once
 namespace nv {
 // The current instance of novella
 class Context {
