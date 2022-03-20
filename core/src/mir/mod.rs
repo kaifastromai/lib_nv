@@ -3,11 +3,13 @@ use std::collections::VecDeque;
 use crate::action::request::Reqman;
 use crate::action::Actman;
 use crate::ecs::archetypes;
+use crate::ecs::ComponentId;
 use crate::ecs::ComponentTy;
 use crate::ecs::Entity;
 use crate::ecs::Entman;
 use crate::ecs::Id;
 use crate::Project;
+use anyhow::{anyhow, Result};
 
 pub struct MirData {
     pub em: Entman,
@@ -51,5 +53,20 @@ impl Mir {
     }
     pub fn get_all_living_entities(&self) -> Vec<Id> {
         self.data.em.get_all_living_entities()
+    }
+    pub fn get_entity_component_by_id<T: ComponentTy>(
+        &'static self,
+        entity: Id,
+        component_id: ComponentId,
+    ) -> Result<&crate::ecs::Component<T>> {
+        self.data
+            .em
+            .get_entity_component_by_id(entity, component_id)
+    }
+    pub fn get_component_with_id<T: ComponentTy>(
+        &self,
+        component_id: ComponentId,
+    ) -> Result<&crate::ecs::Component<T>> {
+        self.data.em.get_component_with_id(component_id)
     }
 }

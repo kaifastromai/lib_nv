@@ -1,8 +1,7 @@
 use nvcore::{
-    ecs::{Entity, Id},
+    ecs::{component::*, ComponentId, Entity, Id},
     mir::Mir,
 };
-
 pub struct ContextInternal {
     pub mir: Mir,
 }
@@ -33,6 +32,59 @@ impl ContextInternal {
             .map(|id| ffi::Id::from_internal_id(*id))
             .collect()
     }
+    pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::Field {
+        let field_comp = self
+            .mir
+            .get_component_with_id::<Field>(field_id.into())
+            .unwrap();
+        //convert to raw pointer
+        let field_comp_ptr = std::ptr::addr_of!(field_comp.component);
+        //#We know that the memory layout ought to be the same as the C++ struct
+        unsafe { std::mem::transmute::<*const Field, *mut ffi::Field>(field_comp_ptr) }
+    }
+    pub fn get_name_component_with_id(&self, name_id: ffi::Id) -> *mut ffi::Name {
+        let name_comp = self
+            .mir
+            .get_component_with_id::<Name>(name_id.into())
+            .unwrap();
+        //convert to raw pointer
+        let name_comp_ptr = std::ptr::addr_of!(name_comp.component);
+        //#We know that the memory layout ought to be the same as the C++ struct
+        unsafe { std::mem::transmute::<*const Name, *mut ffi::Name>(name_comp_ptr) }
+    }
+    //Video component
+    pub fn get_video_component_with_id(&self, video_id: ffi::Id) -> *mut ffi::Video {
+        let video_comp = self
+            .mir
+            .get_component_with_id::<Video>(video_id.into())
+            .unwrap();
+        //convert to raw pointer
+        let video_comp_ptr = std::ptr::addr_of!(video_comp.component);
+        //#We know that the memory layout ought to be the same as the C++ struct
+        unsafe { std::mem::transmute::<*const Video, *mut ffi::Video>(video_comp_ptr) }
+    }
+    //Audio component
+    pub fn get_audio_component_with_id(&self, audio_id: ffi::Id) -> *mut ffi::Audio {
+        let audio_comp = self
+            .mir
+            .get_component_with_id::<Audio>(audio_id.into())
+            .unwrap();
+        //convert to raw pointer
+        let audio_comp_ptr = std::ptr::addr_of!(audio_comp.component);
+        //#We know that the memory layout ought to be the same as the C++ struct
+        unsafe { std::mem::transmute::<*const Audio, *mut ffi::Audio>(audio_comp_ptr) }
+    }
+    //Image component
+    pub fn get_image_component_with_id(&self, image_id: ffi::Id) -> *mut ffi::Image {
+        let image_comp = self
+            .mir
+            .get_component_with_id::<Image>(image_id.into())
+            .unwrap();
+        //convert to raw pointer
+        let image_comp_ptr = std::ptr::addr_of!(image_comp.component);
+        //#We know that the memory layout ought to be the same as the C++ struct
+        unsafe { std::mem::transmute::<*const Image, *mut ffi::Image>(image_comp_ptr) }
+    }
 }
 pub fn new_ctx() -> *mut ContextInternal {
     Box::into_raw(Box::new(ContextInternal { mir: Mir::new() }))
@@ -61,6 +113,11 @@ impl From<ffi::Id> for Id {
         Id::from_be_bytes(mem)
     }
 }
+impl From<ffi::Id> for ComponentId {
+    fn from(id: ffi::Id) -> Self {
+        ComponentId::from(Id::from(id))
+    }
+}
 
 #[cxx::bridge]
 mod ffi {
@@ -69,6 +126,15 @@ mod ffi {
     #[derive(PartialOrd, Ord, PartialEq, Eq)]
     struct Id {
         id: [u8; 16],
+    }
+
+    #[namespace = "components"]
+    pub enum ComponentTypes {
+        Field,
+        Name,
+        Video,
+        Audio,
+        Image,
     }
 
     #[namespace = "components"]
@@ -99,14 +165,12 @@ mod ffi {
         image_data: String,
     }
 
-    #[namespace = "components"]
-
     pub struct Name {
         pub name: String,
         pub aliases: Vec<String>,
     }
     #[namespace = "components"]
-    pub struct CharacterNameFormat {
+    struct CharacterNameFormat {
         pub given_name: String,
         pub other_names: Vec<String>,
         pub family_name: String,
@@ -128,6 +192,7 @@ mod ffi {
         pub fn to_string(self: &Id) -> String;
         pub fn get_all_living_entities(&self) -> Vec<Id>;
         pub unsafe fn drop(ctx: *mut ContextInternal);
+        pub fn get_field_component_with_id(&self, field_id: Id) -> *mut Field;
 
     }
 }

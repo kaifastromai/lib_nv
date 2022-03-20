@@ -176,6 +176,7 @@ pub fn action_derive(input: TokenStream) -> TokenStream {
 pub fn component_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
+    let name_str = name.to_string();
     let generics = &input.generics;
     //remove default params for the generics
     let mut impl_generics = generics
@@ -213,6 +214,15 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
           fn clean(&mut self){
              todo!()
           }
+          fn get_component_name(&self)->&'static str{
+             #name_str
+          }
+          fn get_any(&self)->&dyn std::any::Any{
+             self
+          }
+          fn get_any_mut(&mut self)->&mut dyn std::any::Any{
+             self
+          }
         }
 
 
@@ -226,33 +236,15 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     input.attrs.append(
         &mut syn::Attribute::parse_outer
             .parse2(quote! {
-                #[derive(nvproc::Component, Clone)]
+                #[derive(Component, Default)]
+                #[repr(C)]
             })
             .unwrap(),
     );
-    if let syn::Fields::Named(fields) = &mut input.fields {
-        fields.named.push(
-            syn::Field::parse_named
-                .parse2(quote! {
-                    owning_entity:IndexType
-                })
-                .unwrap(),
-        );
-        fields.named.push(
-            syn::Field::parse_named
-                .parse2(quote! {
-                    _is_marked_del:bool
-                })
-                .unwrap(),
-        );
-
-        quote! {
-            #input
-        }
-        .into()
-    } else {
-        panic!("Only structs with named fields are supported");
+    quote! {
+        #input
     }
+    .into()
 }
 #[proc_macro_attribute]
 ///Generates a component type for every struct in the input module

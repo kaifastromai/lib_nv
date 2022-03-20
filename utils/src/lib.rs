@@ -164,6 +164,9 @@ pub mod uuid {
         uuid::Uuid::new_v4().as_u128()
     }
 }
+pub fn type_name<T: ?Sized>() -> &'static str {
+    std::any::type_name::<T>()
+}
 
 #[cfg(test)]
 mod test_super {
@@ -171,6 +174,7 @@ mod test_super {
 
     #[test]
     fn test_to_snake_case() {
+
         let test = "TestStringVEN";
         assert_eq!(test.to_snake_case(), "test_string_ven");
     }

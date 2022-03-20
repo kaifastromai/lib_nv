@@ -1,5 +1,9 @@
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
 #![feature(const_generics_defaults)]
+#![feature(generic_arg_infer, thread_local)]
+
+
+
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
@@ -7,6 +11,7 @@ use std::collections::HashMap;
 mod action;
 pub mod ecs;
 pub mod mir;
+pub mod binary_storage;
 use ecs::{Entman, Id};
 use utils::{text::TextChunk, uuid};
 
