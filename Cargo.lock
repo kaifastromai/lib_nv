@@ -309,16 +309,13 @@ dependencies = [
 name = "nvcore"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "chrono",
  "dyn-clone",
  "lazy_static",
  "num",
  "nvproc",
- "petgraph",
  "proc-macro2",
  "serde",
- "serde_json",
  "utils",
 ]
 
@@ -327,6 +324,7 @@ name = "nvfs"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "utils",
 ]
 
 [[package]]
@@ -490,6 +488,7 @@ checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 name = "utils"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "petgraph",
  "serde",
  "serde_json",

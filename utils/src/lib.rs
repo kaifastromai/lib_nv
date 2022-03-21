@@ -174,7 +174,6 @@ mod test_super {
 
     #[test]
     fn test_to_snake_case() {
-
         let test = "TestStringVEN";
         assert_eq!(test.to_snake_case(), "test_string_ven");
     }

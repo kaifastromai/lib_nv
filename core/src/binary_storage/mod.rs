@@ -4,10 +4,11 @@ Because there is potentially a lot of data to be stored, (all of which cannot be
 */
 
 use crate::ecs::{component::*, ComponentTy, Id};
+use utils::prelude::serde;
 use utils::uuid;
 
 pub struct VirtualPath(PathBuf);
-pub trait BinaryStorageTy: serde::Serialize {
+pub trait BinaryStorageTy: Serialize {
     fn to_bytes(&self) -> Vec<u8>;
 }
 

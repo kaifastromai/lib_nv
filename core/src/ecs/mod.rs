@@ -6,20 +6,23 @@ pub use serde::{Deserialize, Serialize};
 use utils::{prelude::*, type_name, uuid};
 
 use anyhow::{anyhow, Result};
+use serde as _serde;
 use std::{
     any::{Any, TypeId},
     collections::{BTreeSet, HashMap},
     fmt::Display,
 };
-
+extern crate serde;
 enum ComponentTypes {}
 pub type Id = u128;
 #[derive(
     Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
 )]
+
 pub struct ComponentId {
     id: u128,
 }
+
 //impl deref for ComponentId that returns the inner type
 impl std::ops::Deref for ComponentId {
     type Target = u128;
@@ -59,6 +62,7 @@ pub trait ComponentTy: 'static {
     fn get_any(&self) -> &dyn Any;
     fn get_any_mut(&mut self) -> &mut dyn Any;
 }
+
 pub trait ComponentReqsTy: 'static {
     fn get_type_id() -> TypeId {
         TypeId::of::<Self>()
@@ -232,7 +236,6 @@ impl<T: ComponentTy> CommonComponentStoreTy for CommonComponentStore<T> {
         self
     }
 }
-
 //----------------------------------------------------------------------------------------------------------------------//
 
 pub struct Component<T: ComponentTy> {
@@ -314,6 +317,7 @@ impl<T: ComponentTy> ComponentTy for Component<T> {
         self.get_inner_mut().clean();
     }
 }
+
 //implement Eq and Hash for Component<T>
 impl<T: ComponentTy> Eq for Component<T> {}
 //implement partial_eq for Component<T>

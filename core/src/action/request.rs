@@ -3,7 +3,7 @@ use std::any::{self, Any};
 use crate::mir::{Mir, MirData};
 
 use super::ParamTy;
-use anyhow::{anyhow, Result};
+use utils::prelude::anyhow::{anyhow, Result};
 
 ///A request is ultimately just a function that takes a reference to Mir, and a generic parameter P that is the type of the parameter
 /// And the type of data it is expected to return

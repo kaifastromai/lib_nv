@@ -2,9 +2,9 @@
  * It is designed to be able to store and retrieve data from a .nv file, and to stream data from disk to memory, as needed.
  * It based on a sqlite database.
 */
+use rusqlite::Connection;
 use std::path::{Path, PathBuf};
-
-use rusqlite::{Connection, Result};
+use utils::prelude::anyhow::{anyhow, Result};
 
 pub enum FsPath {
     ///The data is stored inside of a .nv file
@@ -13,9 +13,67 @@ pub enum FsPath {
     File(PathBuf),
 }
 pub enum Inode<'a> {
-    Dir(&'a Inode<'a>),
+    Dir(DinodeData<'a>),
+    Item(InodeData),
+    Uninit,
 }
-pub struct Vfs {}
+pub enum ExtTypes {
+    Video,
+    Audio,
+    Image,
+    Binary,
+    Component,
+    String(String),
+}
+pub struct InodeData {
+    pub id: u64,
+    pub parent_id: u64,
+    pub ext: ExtTypes,
+    pub name: String,
+    pub data: u64,
+}
+pub struct DinodeData<'a> {
+    pub id: u64,
+    pub parent_id: u64,
+    pub ext: ExtTypes,
+    pub name: String,
+    pub data: Vec<&'a Inode<'a>>,
+}
+pub struct Vfs<'a> {
+    pub data: Vec<Vec<u8>>,
+    pub inodes: Inode<'a>,
+}
+
+impl<'a> Vfs<'a> {
+    pub fn new() -> Self {
+        Vfs {
+            data: Vec::new(),
+            inodes: Inode::Dir(DinodeData {
+                id: 0,
+                parent_id: 0,
+                ext: ExtTypes::String("root".to_string()),
+                name: "nv_root".to_string(),
+                data: Vec::new(),
+            }),
+        }
+    }
+    pub fn get(&self, path: FsPath) -> Inode {
+        todo!()
+    }
+    fn path_to_inode(&self, path: PathBuf) -> Inode {
+        let mut inode = Inode::Uninit;
+        for x in path.iter() {}
+        todo!()
+    }
+    pub fn create_dir(&mut self, path: FsPath) {}
+}
+
+impl<'a> Default for Vfs<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Nvfs {
     pub connection: Connection,
 }
@@ -115,4 +173,6 @@ mod test_super {
         let row: u32 = rows.next().unwrap().unwrap();
         assert_eq!(test_struct.id, row);
     }
+    #[test]
+    fn test_inode_create() {}
 }
