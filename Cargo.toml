@@ -1,2 +1,2 @@
 [workspace]
-members = ["core", "utils", "csl", "nv_api"]
+members = ["core", "utils", "csl", "nv_api", "nvfs"]

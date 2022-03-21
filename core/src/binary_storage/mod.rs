@@ -3,11 +3,6 @@ Because there is potentially a lot of data to be stored, (all of which cannot be
  the BinaryStorage is designed to be able to stream data from disk to memory,as needed.
 */
 
-///[Nvfs] is the Novella Virtual File System. It is an abstraction over both the real os file system and an internal 
-///  virtual filesystem stored in the .nv project file and possibly in memory. 
-mod Nvfs{
-
-}
 use crate::ecs::{component::*, ComponentTy, Id};
 use utils::uuid;
 
