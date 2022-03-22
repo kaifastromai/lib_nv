@@ -4,7 +4,7 @@ Because there is potentially a lot of data to be stored, (all of which cannot be
 */
 
 use crate::ecs::{component::*, ComponentTy, Id};
-use utils::prelude::serde;
+use utils::exports::serde;
 use utils::uuid;
 
 pub struct VirtualPath(PathBuf);
@@ -13,12 +13,14 @@ pub trait BinaryStorageTy: Serialize {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(crate="utils::exports::serde")]
 pub struct BinaryFileItem<T: BinaryStorageTy> {
     pub id: Id,
     pub path: PathBuf,
     pub data: T,
 }
 #[derive(Serialize, Deserialize)]
+#[serde(crate="utils::exports::serde")]
 pub struct BinaryInternalItem<T: BinaryStorageTy> {
     pub id: Id,
     pub data: T,
@@ -39,5 +41,7 @@ pub struct BinaryStorage {
     pub path: PathBuf,
 }
 
+
 #[derive(Serialize, Deserialize)]
+#[serde(crate="utils::exports::serde")]
 pub struct InternalStorage {}

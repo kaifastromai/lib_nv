@@ -315,7 +315,6 @@ dependencies = [
  "num",
  "nvproc",
  "proc-macro2",
- "serde",
  "utils",
 ]
 
@@ -331,6 +330,7 @@ dependencies = [
 name = "nvproc"
 version = "0.1.0"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
  "utils",

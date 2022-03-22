@@ -3,22 +3,19 @@ pub mod component;
 pub mod prelude;
 use super::*;
 pub use serde::{Deserialize, Serialize};
-use utils::{prelude::*, type_name, uuid};
+use utils::{exports::*, type_name, uuid};
 
 use anyhow::{anyhow, Result};
-use serde as _serde;
+
 use std::{
     any::{Any, TypeId},
     collections::{BTreeSet, HashMap},
     fmt::Display,
 };
-extern crate serde;
 enum ComponentTypes {}
 pub type Id = u128;
-#[derive(
-    Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord,
-)]
-
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[nvproc::serde_derive("utils::exports::serde")]
 pub struct ComponentId {
     id: u128,
 }

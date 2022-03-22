@@ -9,7 +9,7 @@ use crate::ecs::Entity;
 use crate::ecs::Entman;
 use crate::ecs::Id;
 use crate::Project;
-use anyhow::{anyhow, Result};
+use utils::exports::anyhow::{anyhow, Result};
 
 pub struct MirData {
     pub em: Entman,

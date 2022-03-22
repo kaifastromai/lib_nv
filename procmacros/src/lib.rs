@@ -1,6 +1,6 @@
 #![feature(proc_macro_diagnostic)]
-extern crate proc_macro;
 use proc_macro::{Diagnostic, Level, TokenStream};
+use proc_macro2 as pm2;
 use quote::{format_ident, quote, ToTokens, __private::Span};
 use syn::{
     parse::{Parse, Parser},
@@ -473,6 +473,26 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
         #components_iterator
     }
     .into()
+}
+
+//Adds serde's Serialize and Deserialize derive macros to the given struct,
+//and optionally accept an additional parameter to specify the crate name
+#[proc_macro_attribute]
+pub fn serde_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let crate_name: pm2::TokenStream = attr.into();
+    let mut input = syn::parse_macro_input!(item as syn::ItemStruct);
+    let derive_attr = quote! {
+        #[derive(Serialize,Deserialize)]
+        #[serde(crate = #crate_name)]
+    };
+    input.attrs.append(
+        &mut syn::Attribute::parse_outer
+            .parse2(quote! {
+               #derive_attr
+            })
+            .unwrap(),
+    );
+    input.into_token_stream().into()
 }
 
 #[cfg(test)]

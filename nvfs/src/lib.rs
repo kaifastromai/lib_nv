@@ -3,8 +3,10 @@
  * It based on a sqlite database.
 */
 use rusqlite::Connection;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use utils::prelude::anyhow::{anyhow, Result};
+use std::sync::Arc;
+use utils::exports::anyhow::{anyhow, Result};
 
 pub enum FsPath {
     ///The data is stored inside of a .nv file
@@ -12,10 +14,9 @@ pub enum FsPath {
     ///The data is stored in a file on the disk, and is accessed via a path
     File(PathBuf),
 }
-pub enum Inode<'a> {
-    Dir(DinodeData<'a>),
+pub enum Inode {
+    Dir(DinodeData),
     Item(InodeData),
-    Uninit,
 }
 pub enum ExtTypes {
     Video,
@@ -24,7 +25,10 @@ pub enum ExtTypes {
     Binary,
     Component,
     String(String),
+    // a special extension for a directory
+    Dir,
 }
+//An inode representing a file
 pub struct InodeData {
     pub id: u64,
     pub parent_id: u64,
@@ -32,43 +36,103 @@ pub struct InodeData {
     pub name: String,
     pub data: u64,
 }
-pub struct DinodeData<'a> {
+//An inode representing a directory
+pub struct DinodeData {
     pub id: u64,
     pub parent_id: u64,
     pub ext: ExtTypes,
     pub name: String,
-    pub data: Vec<&'a Inode<'a>>,
+    pub data: Vec<u64>,
 }
-pub struct Vfs<'a> {
+pub struct Vfs {
     pub data: Vec<Vec<u8>>,
-    pub inodes: Inode<'a>,
+    pub inodes: HashMap<u64, Inode>,
+    pub index_used_list: Vec<u64>,
 }
 
-impl<'a> Vfs<'a> {
+impl Vfs {
     pub fn new() -> Self {
         Vfs {
             data: Vec::new(),
-            inodes: Inode::Dir(DinodeData {
-                id: 0,
-                parent_id: 0,
-                ext: ExtTypes::String("root".to_string()),
-                name: "nv_root".to_string(),
-                data: Vec::new(),
-            }),
+            inodes: HashMap::from([(
+                0,
+                Inode::Dir(DinodeData {
+                    id: 0,
+                    parent_id: 0,
+                    ext: ExtTypes::Dir,
+                    name: "nv_root".to_string(),
+                    data: Vec::new(),
+                }),
+            )]),
+            index_used_list: vec![0],
         }
+    }
+    pub fn get_node(&self, id: u64) -> &Inode {
+        self.inodes.get(&id).unwrap()
+    }
+    pub fn get_node_mut(&mut self, id: u64) -> &mut Inode {
+        self.inodes.get_mut(&id).unwrap()
     }
     pub fn get(&self, path: FsPath) -> Inode {
         todo!()
     }
+
     fn path_to_inode(&self, path: PathBuf) -> Inode {
-        let mut inode = Inode::Uninit;
-        for x in path.iter() {}
         todo!()
     }
-    pub fn create_dir(&mut self, path: FsPath) {}
+    //The path should not be implicitely in terms of the nv_root;
+    pub fn create_dir(&mut self, path: PathBuf) -> Result<()> {
+        let starting_path = path.iter().next();
+        let sub_path = path.strip_prefix(starting_path.unwrap()).unwrap();
+        //into PathBuf
+        let sub_path_buf = PathBuf::from(sub_path);
+        //call recursive
+        self.create_dir_recursive(sub_path_buf, 0)
+    }
+    fn create_dir_recursive(&mut self, path: PathBuf, parent_node: u64) -> Result<()> {
+        match path.iter().nth(1) {
+            //theres more to go
+            Some(p) => {
+                //find the path with the name in the parent node
+                if let Inode::Dir(dir) = self.get_node(parent_node) {
+                    for id in dir.data.iter() {
+                        if let Inode::Dir(dir) = self.get_node(*id) {
+                            if dir.name == p.to_str().unwrap() {
+                                let sub_path =
+                                    path.strip_prefix(path.iter().next().unwrap()).unwrap();
+                                let sub_path_buf = PathBuf::from(sub_path);
+                                let id = *id;
+                                return self.create_dir_recursive(sub_path_buf, id);
+                            }
+                        }
+                    }
+                }
+            }
+            //this is the last path, create the dinode
+            None => {
+                //create the dinode
+                let dinode = DinodeData {
+                    id: self.index_used_list.len() as u64,
+                    parent_id: parent_node,
+                    ext: ExtTypes::Dir,
+                    name: path.to_string_lossy().to_string(),
+                    data: Vec::new(),
+                };
+                //add the dinode to the index used list
+                self.index_used_list.push(dinode.id);
+                //add the dinode to the inode list
+                self.inodes.insert(dinode.id, Inode::Dir(dinode));
+
+                //return
+                return Ok(());
+            }
+        }
+
+        todo!()
+    }
 }
 
-impl<'a> Default for Vfs<'a> {
+impl Default for Vfs {
     fn default() -> Self {
         Self::new()
     }
