@@ -248,7 +248,7 @@ impl<'ac> Actman<'ac> {
         //execute and collect any resources
         let rsrc = action.exec(self.mir_ref)?;
         //generate a resource id
-        let resource_id = uuid::generate();
+        let resource_id = uuid::gen_128();
         action.set_id(resource_id);
         self.resources.insert(resource_id, rsrc);
         //advance the cursor

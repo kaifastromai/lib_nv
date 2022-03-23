@@ -101,9 +101,9 @@ mod test_relationship {
         let mut graph = RelationshipGraph {
             graph: DiGraph::new(),
         };
-        let ent1 = uuid::generate();
-        let ent2 = uuid::generate();
-        let ent3 = uuid::generate();
+        let ent1 = uuid::gen_128();
+        let ent2 = uuid::gen_128();
+        let ent3 = uuid::gen_128();
         let father = Relationship {
             relationship_name: "FatherSon".to_string(),
             relation: ERelationship::parent_child(Parent::Father, Child::Son),

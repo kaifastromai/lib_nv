@@ -15,6 +15,16 @@ use utils::{
     uuid,
 };
 
+///A note represents a note that can be created by the user.
+
+pub struct Note {
+    id: Id,
+    pub name: String,
+    pub description: String,
+    pub note: String,
+    pub involved_entities: Vec<Id>,
+    time_meta: TimeMetaData,
+}
 pub struct Progression {
     id: Id,
     name: String,
@@ -111,21 +121,40 @@ impl PartialEq for Manuscript {
         self.id == other.id
     }
 }
-//impl Hash for Manuscript based on entity id
+//impl Hash for Manuscript based on id
 impl std::hash::Hash for Manuscript {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
+pub struct TimeMetaData {
+    creation_date: DateTime<Utc>,
+    last_modified_date: DateTime<Utc>,
+}
+impl TimeMetaData {
+    pub fn new() -> Self {
+        TimeMetaData {
+            creation_date: Utc::now(),
+            last_modified_date: Utc::now(),
+        }
+    }
+    pub fn get_creation_date(&self) -> DateTime<Utc> {
+        self.creation_date
+    }
+    pub fn get_last_modified_date(&self) -> DateTime<Utc> {
+        self.last_modified_date
+    }
+    pub fn set_last_modified_date(&mut self, date: DateTime<Utc>) {
+        self.last_modified_date = date;
+    }
+}
 pub struct ProjectMetaData {
     author: String,
     description: String,
     name: String,
     version: String,
-    creation_date: DateTime<Utc>,
-    total_edit_time: chrono::Duration,
-    last_edit_date: chrono::DateTime<Utc>,
+    time_meta: TimeMetaData,
 }
 impl ProjectMetaData {
     pub fn new() -> Self {
@@ -134,9 +163,7 @@ impl ProjectMetaData {
             description: String::new(),
             name: String::new(),
             version: String::new(),
-            creation_date: Utc::now(),
-            total_edit_time: chrono::Duration::zero(),
-            last_edit_date: Utc::now(),
+            time_meta: TimeMetaData::new(),
         }
     }
 }
@@ -148,28 +175,31 @@ pub struct Project {
     pub scenes: HashMap<Id, Scene>,
     pub arcs: HashMap<Id, Arc>,
     pub timelines: HashMap<Id, Timeline>,
+    pub notes: HashMap<Id, Note>,
 }
 impl Project {
     pub fn new(name: &str, description: &str) -> Self {
         Project {
-            id: uuid::generate(),
+            id: uuid::gen_128(),
             project_meta_data: ProjectMetaData::new(),
             description: String::from(description),
             manuscripts: HashMap::new(),
             scenes: HashMap::new(),
             arcs: HashMap::new(),
             timelines: HashMap::new(),
+            notes: HashMap::new(),
         }
     }
     pub fn new_empty() -> Self {
         Project {
-            id: uuid::generate(),
+            id: uuid::gen_128(),
             project_meta_data: ProjectMetaData::new(),
             description: String::new(),
             manuscripts: HashMap::new(),
             scenes: HashMap::new(),
             arcs: HashMap::new(),
             timelines: HashMap::new(),
+            notes: HashMap::new(),
         }
     }
     pub fn add_manuscript(&mut self, manuscript: Manuscript) {
@@ -193,7 +223,6 @@ impl Project {
     }
 }
 
-//A reference to any object that implements Referenceable
 pub struct Timeline {}
 pub struct Arc {}
 pub struct Scene {

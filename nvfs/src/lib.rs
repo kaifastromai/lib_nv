@@ -3,6 +3,7 @@
  * It based on a sqlite database.
 */
 use rusqlite::Connection;
+use std::any::Any;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use utils::exports::{
@@ -10,6 +11,9 @@ use utils::exports::{
     serde::*,
 };
 
+pub trait BinarySerializeTy: 'static {
+    fn get_any(&self) -> &dyn Any;
+}
 
 pub enum FsPath {
     ///The data is stored inside of a .nv file
@@ -62,14 +66,40 @@ impl Inode {
     pub fn get_data(&self) -> Option<u64> {
         match self {
             Inode::Dir(_) => None,
-            Inode::Item(inode) => Some(inode.data),
+            Inode::Item(inode) => Some(inode.payload),
         }
     }
-    //Only valid on directories
-    pub fn get_child_item_ids(&self) -> Option<Vec<u64>> {
+    ///Only valid on directories
+    pub fn dir_get_child_item_ids(&self) -> Option<Vec<u64>> {
         match self {
-            Inode::Dir(dinode) => Some(dinode.data.clone()),
+            Inode::Dir(dinode) => Some(dinode.children.clone()),
             Inode::Item(_) => None,
+        }
+    }
+    ///Only valid for directories. Adds a child item to the directory's children
+    pub fn dir_add_item(&mut self, item_id: u64) -> Result<()> {
+        match self {
+            Inode::Dir(dinode) => {
+                dinode.children.push(item_id);
+                Ok(())
+            }
+            Inode::Item(_) => Err(anyhow!("Can't add item to a non-directory")),
+        }
+    }
+    ///Only valid on items. Sets the payload of the item
+    pub fn item_set_payload(&mut self, payload: u64) -> Result<()> {
+        match self {
+            Inode::Dir(_) => Err(anyhow!("Can't set data on a directory")),
+            Inode::Item(inode) => {
+                inode.payload = payload;
+                Ok(())
+            }
+        }
+    }
+    pub fn item_get_payload_id(&self) -> Result<u64> {
+        match self {
+            Inode::Dir(_) => Err(anyhow!("Can't get payload on a directory")),
+            Inode::Item(inode) => Ok(inode.payload),
         }
     }
 }
@@ -90,7 +120,7 @@ pub struct InodeData {
     pub parent_id: u64,
     pub ext: ExtTypes,
     pub name: String,
-    pub data: u64,
+    pub payload: u64,
 }
 //An inode representing a directory
 pub struct DinodeData {
@@ -98,19 +128,19 @@ pub struct DinodeData {
     pub parent_id: u64,
     pub ext: ExtTypes,
     pub name: String,
-    pub data: Vec<u64>,
+    pub children: Vec<u64>,
 }
-pub trait BinarySerializeTy: 'static {}
 pub struct Vfs {
-    pub data: Vec<Box<dyn BinarySerializeTy>>,
+    pub data: HashMap<u64, Box<dyn BinarySerializeTy>>,
     pub inodes: HashMap<u64, Inode>,
-    pub index_used_list: Vec<u64>,
+    pub node_used_list: Vec<u64>,
+    pub data_used_list: Vec<u64>,
 }
 
 impl Vfs {
     pub fn new() -> Self {
         Vfs {
-            data: Vec::new(),
+            data: HashMap::new(),
             inodes: HashMap::from([(
                 0,
                 Inode::Dir(DinodeData {
@@ -118,10 +148,11 @@ impl Vfs {
                     parent_id: 0,
                     ext: ExtTypes::Dir,
                     name: "nv_root".to_string(),
-                    data: Vec::new(),
+                    children: Vec::new(),
                 }),
             )]),
-            index_used_list: vec![0],
+            node_used_list: vec![0],
+            data_used_list: Vec::new(),
         }
     }
     pub fn get_node(&self, id: u64) -> &Inode {
@@ -137,6 +168,25 @@ impl Vfs {
         let id = self.get_node_from_path_recursive(path_buf, 0)?;
         Ok(self.get_node(id))
     }
+    pub fn get_item_payload<T: BinarySerializeTy>(&self, id: u64) -> Result<&T> {
+        let data = self
+            .data
+            .get(&id)
+            .ok_or_else(|| anyhow!("No data for id {}", id))?;
+        let any = data.get_any();
+        let any_ref: &dyn Any = any;
+        let any_ref_downcast: &T = any_ref
+            .downcast_ref()
+            .ok_or_else(|| anyhow!("Could not downcast to {}", std::any::type_name::<T>()))?;
+        Ok(any_ref_downcast)
+    }
+    pub fn get_node_mut_from_path(&mut self, path: PathBuf) -> Result<&mut Inode> {
+        //skip root
+        let path_start = path.strip_prefix("/").unwrap();
+        let path_buf = PathBuf::from(path_start);
+        let id = self.get_node_from_path_recursive(path_buf, 0)?;
+        Ok(self.get_node_mut(id))
+    }
     pub fn verify_path(&self, path: PathBuf) -> bool {
         let id = self.get_node_from_path(path);
         id.is_ok()
@@ -147,21 +197,48 @@ impl Vfs {
         path: PathBuf,
         item_name: String,
     ) -> Result<()> {
-        let inode = Inode::Item(InodeData {
-            id: self.index_used_list.len() as u64,
-            parent_id: self.get_node_from_path_recursive(path.clone(), 0).unwrap(),
+        let id = self.new_node_id();
+        let parent_dir = self.get_node_mut_from_path(path)?;
+        parent_dir.dir_add_item(id)?;
+
+        let mut inode = Inode::Item(InodeData {
+            id,
+            parent_id: parent_dir.id(),
             ext: ExtTypes::Binary,
             name: item_name,
-            data: self.data.len() as u64,
+            payload: 0,
         });
-        //check path is valid
-        if !self.verify_path(path) {
-            return Err(anyhow!("Path is invalid"));
+        {
+            let item_id = self.add_item_entry(item);
+            inode.item_set_payload(item_id)?;
         }
-        self.index_used_list.push(inode.id());
-        self.inodes.insert(inode.id(), inode);
-        self.data.push(Box::new(item));
+        self.new_inode(inode);
         Ok(())
+    }
+
+    fn add_item_entry<T: BinarySerializeTy>(&mut self, item: T) -> u64 {
+        let id = self.new_item_id();
+        self.data.insert(id, Box::new(item));
+        id
+    }
+    fn new_item_id(&mut self) -> u64 {
+        let mut id = utils::uuid::gen_64();
+        while self.data_used_list.contains(&id) {
+            id = utils::uuid::gen_64();
+        }
+        self.data_used_list.push(id);
+        id
+    }
+    fn new_node_id(&mut self) -> u64 {
+        let mut id = utils::uuid::gen_64();
+        while self.node_used_list.contains(&id) {
+            id = utils::uuid::gen_64();
+        }
+        self.node_used_list.push(id);
+        id
+    }
+    fn new_inode(&mut self, node: Inode) {
+        self.inodes.insert(node.id(), node);
     }
     fn get_node_from_path_recursive(&self, path: PathBuf, parent_node: u64) -> Result<u64> {
         match path.iter().nth(1) {
@@ -170,7 +247,7 @@ impl Vfs {
                 let p = path.iter().next().unwrap();
                 //find id of node
                 if let Inode::Dir(dir) = self.get_node(parent_node) {
-                    let id = dir.data.iter().find(|x| {
+                    let id = dir.children.iter().find(|x| {
                         let node = self.get_node(**x);
                         if let Inode::Dir(dir) = node {
                             dir.name == p.to_str().unwrap()
@@ -193,7 +270,7 @@ impl Vfs {
             //this is the last item, just check for the item
             None => {
                 if let Inode::Dir(dir) = self.get_node(parent_node) {
-                    let id = dir.data.iter().find(|x| {
+                    let id = dir.children.iter().find(|x| {
                         let node = self.get_node(**x);
                         node.name() == path.file_name().unwrap().to_str().unwrap()
                     });
@@ -212,7 +289,8 @@ impl Vfs {
     fn path_to_inode(&self, path: PathBuf) -> Inode {
         todo!()
     }
-    //The path should not be implicitely in terms of the nv_root;
+
+    //The path should be implicitely in terms of the nv_root;
     pub fn create_dir(&mut self, path: PathBuf) -> Result<()> {
         let starting_path = path.iter().next();
         let sub_path = path.strip_prefix(starting_path.unwrap()).unwrap();
@@ -228,7 +306,7 @@ impl Vfs {
                 let p = path.iter().next().unwrap();
                 //find the path with the name in the parent node
                 if let Inode::Dir(dir) = self.get_node(parent_node) {
-                    for id in dir.data.iter() {
+                    for id in dir.children.iter() {
                         if let Inode::Dir(dir) = self.get_node(*id) {
                             if dir.name == p.to_str().unwrap() {
                                 let sub_path =
@@ -246,16 +324,16 @@ impl Vfs {
             None => {
                 //create the dinode
                 let dinode = DinodeData {
-                    id: self.index_used_list.len() as u64,
+                    id: self.node_used_list.len() as u64,
                     parent_id: parent_node,
                     ext: ExtTypes::Dir,
                     name: path.to_string_lossy().to_string(),
-                    data: Vec::new(),
+                    children: Vec::new(),
                 };
                 //add the dinode to the index used list
-                self.index_used_list.push(dinode.id);
+                self.node_used_list.push(dinode.id);
                 if let Inode::Dir(dir) = self.get_node_mut(parent_node) {
-                    dir.data.push(dinode.id);
+                    dir.children.push(dinode.id);
                 }
                 //add the dinode to the inode list
                 self.inodes.insert(dinode.id, Inode::Dir(dinode));
@@ -265,6 +343,11 @@ impl Vfs {
                 Ok(())
             }
         }
+    }
+}
+impl<T: 'static> BinarySerializeTy for T {
+    fn get_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -329,7 +412,6 @@ mod test_super {
         pub name: String,
         pub description: String,
     }
-    impl BinarySerializeTy for TestStruct {}
 
     #[test]
     fn test_serialize() {
@@ -394,9 +476,10 @@ mod test_super {
     }
 
     #[test]
-    fn test_add_payload() {
+    fn test_add_payload() -> Result<()> {
         let mut vfs = Vfs::new();
         vfs.create_dir(PathBuf::from("/test")).unwrap();
+        vfs.create_dir(PathBuf::from("/test/test1")).unwrap();
         vfs.create_dir(PathBuf::from("/test/test2")).unwrap();
         let ts1 = TestStruct {
             id: 1,
@@ -428,5 +511,15 @@ mod test_super {
             .unwrap();
         assert_eq!(inode1.name(), "test1.struct");
         assert_eq!(inode2.name(), "test2.struct");
+        let item1 = vfs
+            .get_item_payload::<TestStruct>(inode1.item_get_payload_id()?)
+            .unwrap();
+        let item2 = vfs
+            .get_item_payload::<TestStruct>(inode2.item_get_payload_id()?)
+            .unwrap();
+        assert_eq!(item1.id, 1);
+        assert_eq!(item2.id, 2);
+
+        Ok(())
     }
 }

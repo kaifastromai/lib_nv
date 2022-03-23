@@ -53,37 +53,15 @@ impl ContextInternal {
         unsafe { std::mem::transmute::<*const Name, *mut ffi::Name>(name_comp_ptr) }
     }
     //Video component
-    pub fn get_video_component_with_id(&self, video_id: ffi::Id) -> *mut ffi::Video {
+    pub fn get_binary_component_with_id(&self, video_id: ffi::Id) -> *mut ffi::BinaryData {
         let video_comp = self
             .mir
-            .get_component_with_id::<Video>(video_id.into())
+            .get_component_with_id::<BinaryData>(video_id.into())
             .unwrap();
         //convert to raw pointer
         let video_comp_ptr = std::ptr::addr_of!(video_comp.component);
         //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const Video, *mut ffi::Video>(video_comp_ptr) }
-    }
-    //Audio component
-    pub fn get_audio_component_with_id(&self, audio_id: ffi::Id) -> *mut ffi::Audio {
-        let audio_comp = self
-            .mir
-            .get_component_with_id::<Audio>(audio_id.into())
-            .unwrap();
-        //convert to raw pointer
-        let audio_comp_ptr = std::ptr::addr_of!(audio_comp.component);
-        //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const Audio, *mut ffi::Audio>(audio_comp_ptr) }
-    }
-    //Image component
-    pub fn get_image_component_with_id(&self, image_id: ffi::Id) -> *mut ffi::Image {
-        let image_comp = self
-            .mir
-            .get_component_with_id::<Image>(image_id.into())
-            .unwrap();
-        //convert to raw pointer
-        let image_comp_ptr = std::ptr::addr_of!(image_comp.component);
-        //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const Image, *mut ffi::Image>(image_comp_ptr) }
+        unsafe { std::mem::transmute::<*const BinaryData, *mut ffi::BinaryData>(video_comp_ptr) }
     }
 }
 pub fn new_ctx() -> *mut ContextInternal {
@@ -144,25 +122,11 @@ mod ffi {
     }
 
     #[namespace = "components"]
-    pub struct Video {
+    pub struct BinaryData {
         description: String,
         video_name: String,
         video_type: String,
         video_data: String,
-    }
-    #[namespace = "components"]
-    pub struct Audio {
-        description: String,
-        audio_name: String,
-        audio_type: String,
-        audio_data: String,
-    }
-
-    #[namespace = "components"]
-    pub struct Image {
-        name: String,
-        description: String,
-        image_data: String,
     }
 
     pub struct Name {

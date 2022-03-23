@@ -1,41 +1,52 @@
 pub mod relationship;
 
-use std::path::{Path, PathBuf};
+use std::{
+    any::Any,
+    path::{Path, PathBuf},
+};
 
 use nvproc::{component, Component};
 
+use super::{ComponentTy, Id};
+
+pub enum BinaryDataType {
+    Audio,
+    Video,
+    Image,
+    Other,
+}
+pub struct BinaryData {
+    pub id: Id,
+    pub name: String,
+    pub description: String,
+    pub data_type: BinaryDataType,
+    pub data_path: PathBuf,
+}
+impl ComponentTy for BinaryData {
+    fn get_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn get_component_name(&self) -> &'static str {
+        "BinaryData"
+    }
+
+    fn clean(&mut self) {
+        todo!()
+    }
+
+    fn get_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
 pub struct ArchetypeComponent {
     pub archetype_name: String,
-}
-
-pub trait BinaryTy {
-    fn to_bytes(&self) -> Vec<u8>;
 }
 
 #[component]
 pub struct Field {
     pub name: String,
     pub value: String,
-}
-#[component]
-pub struct Video {
-    description: String,
-    video_name: String,
-    video_type: String,
-    video_data: PathBuf,
-}
-#[component]
-pub struct Audio {
-    description: String,
-    audio_name: String,
-    audio_type: String,
-    audio_data: PathBuf,
-}
-#[component]
-pub struct Image {
-    name: String,
-    description: String,
-    image_data: PathBuf,
 }
 
 #[component]

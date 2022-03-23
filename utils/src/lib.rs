@@ -160,8 +160,11 @@ pub mod text {
 }
 
 pub mod uuid {
-    pub fn generate() -> u128 {
+    pub fn gen_128() -> u128 {
         uuid::Uuid::new_v4().as_u128()
+    }
+    pub fn gen_64() -> u64 {
+        uuid::Uuid::new_v4().as_u128() as u64
     }
 }
 pub fn type_name<T: ?Sized>() -> &'static str {

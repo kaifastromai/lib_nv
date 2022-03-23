@@ -243,7 +243,7 @@ pub struct Component<T: ComponentTy> {
 impl<T: ComponentTy + Default> Component<T> {
     fn new(entity: Id) -> Self {
         Self {
-            id: uuid::generate().into(),
+            id: uuid::gen_128().into(),
             owning_entity: Some(entity),
             component: T::default(),
         }
@@ -252,14 +252,14 @@ impl<T: ComponentTy + Default> Component<T> {
 impl<T: ComponentTy> Component<T> {
     pub fn from(entity: Id, component: T) -> Self {
         Self {
-            id: uuid::generate().into(),
+            id: uuid::gen_128().into(),
             owning_entity: Some(entity),
             component,
         }
     }
     pub fn from_orphan(component: T) -> Self {
         Self {
-            id: uuid::generate().into(),
+            id: uuid::gen_128().into(),
             owning_entity: None,
             component,
         }
@@ -267,7 +267,7 @@ impl<T: ComponentTy> Component<T> {
     //An orphan component has no owning entity
     pub fn new_orphan(component: T) -> Self {
         Self {
-            id: uuid::generate().into(),
+            id: uuid::gen_128().into(),
             owning_entity: None,
             component,
         }
@@ -749,7 +749,7 @@ impl Entman {
         }
     }
     pub fn add_entity(&mut self) -> Id {
-        let ent = uuid::generate();
+        let ent = uuid::gen_128();
         self.entities.insert(ent, Entity::new(ent));
         ent
     }
