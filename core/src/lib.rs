@@ -1,6 +1,5 @@
+#![feature(min_specialization)]
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
-#![feature(const_generics_defaults)]
-#![feature(generic_arg_infer, thread_local)]
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -8,12 +7,12 @@ mod action;
 pub mod binary_storage;
 pub mod ecs;
 pub mod mir;
-use ecs::{Entman, Id};
-use utils::{
+use common::{
     exports::anyhow::{anyhow, Result},
     text::TextChunk,
     uuid,
 };
+use ecs::{Entman, Id};
 
 ///A note represents a note that can be created by the user.
 

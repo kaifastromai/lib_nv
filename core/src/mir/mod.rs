@@ -2,14 +2,14 @@ use std::collections::VecDeque;
 
 use crate::action::request::Reqman;
 use crate::action::Actman;
-use crate::ecs::archetypes;
+use crate::ecs::component::archetypes;
 use crate::ecs::ComponentId;
 use crate::ecs::ComponentTy;
 use crate::ecs::Entity;
 use crate::ecs::Entman;
 use crate::ecs::Id;
 use crate::Project;
-use utils::exports::anyhow::{anyhow, Result};
+use common::exports::anyhow::{anyhow, Result};
 
 pub struct MirData {
     pub em: Entman,
@@ -37,7 +37,7 @@ impl Mir {
     pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
         self.data.em.add_component(entity, component);
     }
-    pub fn add_archetype<'a, T: archetypes::ArchetypeTy<'a>>(&mut self, entity: Id, archetype: T) {
+    pub fn add_archetype<T: crate::ecs::component::archetypes::ArchetypeTy>(&mut self, entity: Id, archetype: T) {
         todo!()
     }
 

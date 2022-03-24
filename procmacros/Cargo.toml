@@ -13,5 +13,4 @@ proc-macro = true
 syn = { version = "*", features = ["derive", "full", "printing"] }
 quote = "*"
 proc-macro2 = "*"
-uuid = { version = "*", features = ["serde", "v4"] }
-utils = { version = "0.1.0", path = "../utils" }
+uuid = { version = "*", features = ["serde", "v5"] }

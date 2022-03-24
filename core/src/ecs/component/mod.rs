@@ -1,5 +1,10 @@
+pub mod archetypes;
 pub mod relationship;
+use common::type_id::*;
+use linkme::distributed_slice;
+use nvproc::TypeId;
 
+use common::components::COMPONENTS;
 use std::{
     any::Any,
     path::{Path, PathBuf},
@@ -15,6 +20,8 @@ pub enum BinaryDataType {
     Image,
     Other,
 }
+#[distributed_slice(COMPONENTS)]
+static BINARY_DATA: &'static str = "BinaryData";
 pub struct BinaryData {
     pub id: Id,
     pub name: String,
@@ -69,4 +76,12 @@ pub struct CharacterName {
 #[component]
 pub struct BinaryDatum {
     data: PathBuf,
+}
+
+#[cfg(test)]
+mod test_component {
+    use super::*;
+
+    #[test]
+    fn test_type_id() {}
 }

@@ -1,19 +1,22 @@
 //Archetypes map to bevy's bundles
 
-use super::component::Field;
-use super::*;
-struct SigType<T: ComponentTy> {
+use crate::ecs::component::*;
+use crate::ecs::*;
+struct SigType<T: ComponentTypeIdTy> {
     phantom: std::marker::PhantomData<T>,
 }
-impl<T: ComponentTy> SigType<T> {
-    pub fn into_type_id(self) -> TypeId {
-        TypeId::of::<T>()
+impl<T: ComponentTypeIdTy> SigType<T> {
+    pub fn into_type_id(self) -> ComponentTypeId {
+        ComponentTypeId {
+            0: TypeId::of::<T>(),
+        }
     }
 }
-macro_rules! signature {
+
+macro_rules! arch_sig {
     ($($comp:ident),*) => {
         {
-            let mut sig=Vec::<TypeId>::new();
+            let mut sig=Vec::<ComponentTypeId>::new();
             $(
                 let sigtype=SigType::<$comp>{phantom:std::marker::PhantomData};
                 sig.push(sigtype.into_type_id());
@@ -28,7 +31,7 @@ macro_rules! archetype {
     ( $($signature:tt),* ) => {};
 }
 pub struct ArchetypeDescriptor {
-    pub components: Vec<TypeId>,
+    components: Vec<TypeId>,
 }
 impl ArchetypeDescriptor {
     pub fn new_empty() -> Self {
@@ -36,17 +39,19 @@ impl ArchetypeDescriptor {
             components: Vec::new(),
         }
     }
-    pub fn new(components: Vec<TypeId>) -> Self {
-        Self { components }
+    pub fn new(components: Vec<impl ComponentTypeIdTy>) -> Self {
+        Self {
+            components: components.iter().map(|c| c.get_type_id_ref()).collect(),
+        }
     }
 
-    pub fn with_component<T: ComponentTy>(mut self) -> Self {
+    pub fn with_component<T: ComponentTypeIdTy>(mut self) -> Self {
         self.components.push(TypeId::of::<T>());
         self
     }
 }
 
-impl<T: ComponentTy> From<T> for SigType<T> {
+impl<T: ComponentTypeIdTy> From<T> for SigType<T> {
     fn from(_: T) -> Self {
         SigType {
             phantom: std::marker::PhantomData,
@@ -54,36 +59,40 @@ impl<T: ComponentTy> From<T> for SigType<T> {
     }
 }
 
-pub trait ArchetypeTy<'a> {
+pub trait ArchetypeTy {
     fn describe(&self) -> ArchetypeDescriptor;
-    fn consume(self) -> Vec<&'a dyn ComponentTy>;
+    fn consume(self) -> Vec<Box<dyn ComponentTy>>;
 }
-pub struct CharacterArchetype<'a> {
-    archetype_name: String,
-    data: Vec<&'a dyn ComponentTy>,
+pub struct CharacterArchetype {
+    archetype_name: &'static str,
+    data: Vec<Box<dyn ComponentTy>>,
 }
-impl<'a> ArchetypeTy<'a> for CharacterArchetype<'a> {
+impl ArchetypeTy for CharacterArchetype {
     fn describe(&self) -> ArchetypeDescriptor {
-        let descriptor = ArchetypeDescriptor::new(signature!(Field, Field, Field, Field));
+        let descriptor = ArchetypeDescriptor::new(arch_sig!(Field, Field, Field, Field));
         descriptor
     }
-    fn consume(self) -> Vec<&'a dyn ComponentTy> {
+    fn consume(mut self) -> Vec<Box<dyn ComponentTy>> {
         let name = Field {
             name: String::from("name"),
             value: String::from(""),
         };
+        self.data.push(Box::new(name));
         let description = Field {
             name: String::from("description"),
             value: String::from(""),
         };
+        self.data.push(Box::new(description));
         let age = Field {
             name: String::from("age"),
             value: String::from(""),
         };
+        self.data.push(Box::new(age));
         let height = Field {
             name: String::from("height"),
             value: String::from(""),
         };
+        self.data.push(Box::new(height));
         self.data
     }
 }

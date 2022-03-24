@@ -8,4 +8,7 @@ edition = "2021"
 
 [dependencies]
 rusqlite = "*"
-utils = { path = "../utils" }
+common = { path = "../common" }
+nvcore = { version = "*", path = "../core" }
+bincode = "*"
+nvproc = { version = "*", path = "../procmacros" }

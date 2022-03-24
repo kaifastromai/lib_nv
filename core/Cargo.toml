@@ -1,6 +1,6 @@
 [package]
 name = "nvcore"
-version = "0.0.0"
+version = "0.1.0"
 description = "Novella core"
 edition = "2021"
 
@@ -13,8 +13,9 @@ test = true
 [dependencies]
 num = "0.4.0"
 nvproc = { path = "../procmacros" }
-utils = { version = "*", path = "../utils" }
+common = { version = "*", path = "../common" }
 dyn-clone = "1.0.4"
 chrono = "0.4.19"
 proc-macro2 = "*"
 lazy_static = "*"
+linkme = "*"

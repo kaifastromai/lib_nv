@@ -1,4 +1,57 @@
+/*!
+ * The common crate is a collection of common utilities and types used by the other novella crates.
+ * It also re-exports a number of external crates that are used across the novella crates.
+ */
+#![feature(min_specialization)]
 pub mod exports;
+pub mod components {
+    use linkme::distributed_slice;
+
+    #[distributed_slice]
+    pub static COMPONENTS: [&'static str] = [..];
+    //pub fn get_unique_type_id<T>() -> u64 {}
+}
+
+pub mod type_id {
+    pub trait TypeIdTy {
+        fn get_type_id() -> TypeId;
+        fn get_type_id_ref(&self) -> TypeId;
+    }
+    ///A globally unique identifier for a type
+    #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub struct TypeId {
+        pub id: u64,
+    }
+    impl TypeId {
+        pub fn new(id: u64) -> Self {
+            Self { id }
+        }
+        pub fn get_id(&self) -> u64 {
+            self.id
+        }
+        pub fn of<T: TypeIdTy + ?Sized>() -> Self {
+            T::get_type_id()
+        }
+    }
+    impl<T: 'static + ?Sized> TypeIdTy for T {
+        default fn get_type_id() -> TypeId {
+            let ti = std::any::TypeId::of::<T>();
+            //reintrepret as u64
+            unsafe {
+                let id: u64 = std::mem::transmute(ti);
+                TypeId { id }
+            }
+        }
+        default fn get_type_id_ref(&self) -> TypeId {
+            let ti = std::any::TypeId::of::<T>();
+            //reintrepret as u64
+            unsafe {
+                let id: u64 = std::mem::transmute(ti);
+                TypeId { id }
+            }
+        }
+    }
+}
 
 pub trait StringExt {
     fn to_snake_case(&self) -> String;
@@ -167,12 +220,14 @@ pub mod uuid {
         uuid::Uuid::new_v4().as_u128() as u64
     }
 }
-pub fn type_name<T: ?Sized>() -> &'static str {
+///A thin wrapper around std::any::type_name::<T>()
+pub fn type_name_any<T: ?Sized>() -> &'static str {
     std::any::type_name::<T>()
 }
 
 #[cfg(test)]
 mod test_super {
+
     use super::*;
 
     #[test]
@@ -180,4 +235,6 @@ mod test_super {
         let test = "TestStringVEN";
         assert_eq!(test.to_snake_case(), "test_string_ven");
     }
+    #[test]
+    fn test_get_type_name() {}
 }

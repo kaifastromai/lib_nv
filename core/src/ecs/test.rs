@@ -1,6 +1,5 @@
 use super::component::*;
 use super::*;
-use archetypes::*;
 
 #[test]
 fn test_add_component() {
@@ -69,5 +68,4 @@ fn test_get_components() {
             },
         )
         .unwrap();
-        
 }

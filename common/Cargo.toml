@@ -1,5 +1,5 @@
 [package]
-name = "utils"
+name = "common"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,3 +12,5 @@ serde = { version = "*", features = ["serde_derive"] }
 serde_json = "*"
 uuid = { version = "0.8.2", features = ["serde", "v4", "v1"] }
 anyhow = "*"
+linkme = "*"
+nvproc = { version = "*", path = "../procmacros" }

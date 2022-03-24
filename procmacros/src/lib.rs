@@ -2,12 +2,33 @@
 use proc_macro::{Diagnostic, Level, TokenStream};
 use proc_macro2 as pm2;
 use quote::{format_ident, quote, ToTokens, __private::Span};
+use std::hash::*;
 use syn::{
     parse::{Parse, Parser},
     parse_macro_input, DeriveInput, Field,
 };
-use utils::StringExt;
+trait StringExt {
+    fn to_snake_case(&self) -> String;
+}
+impl StringExt for str {
+    fn to_snake_case(&self) -> String {
+        let mut result = String::new();
+        for (i, c) in self.chars().enumerate() {
+            if i == self.len() - 1 {
+                result.push_str(c.to_lowercase().to_string().as_str());
 
+                break;
+            }
+            if !c.is_uppercase() && self.chars().nth(i + 1).unwrap().is_uppercase() {
+                result.push_str(c.to_lowercase().to_string().as_str());
+                result.push('_');
+            } else {
+                result.push_str(c.to_lowercase().to_string().as_str());
+            }
+        }
+        result
+    }
+}
 #[proc_macro_derive(Resource)]
 pub fn resource_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -172,6 +193,30 @@ pub fn action_derive(input: TokenStream) -> TokenStream {
     struct_impl.into()
 }
 
+///Computes a 64bit type_id based on the hash of the name of the type
+#[proc_macro_derive(TypeId)]
+pub fn type_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    //get hash of the component name
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    name.to_string().hash(&mut hasher);
+    let hash_id = hasher.finish();
+    let struct_impl = quote! {
+        impl TypeIdTy for #name{
+            fn get_type_id()->TypeId{
+                TypeId::new(#hash_id)
+            }
+            fn get_type_id_ref(&self)->TypeId{
+                TypeId::new(#hash_id)
+            }
+        }
+        impl crate::ecs::ComponentTypeIdTy for #name{}
+    };
+
+    struct_impl.into()
+}
+
 #[proc_macro_derive(Component)]
 pub fn component_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -229,14 +274,14 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
     };
     impl_block.into()
 }
-
+///Decorates the item with the necessary derives and such for the component
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::ItemStruct);
     input.attrs.append(
         &mut syn::Attribute::parse_outer
             .parse2(quote! {
-                #[derive(Component, Default)]
+                #[derive(Component, Default,TypeId)]
                 #[repr(C)]
             })
             .unwrap(),
@@ -493,6 +538,15 @@ pub fn serde_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
             .unwrap(),
     );
     input.into_token_stream().into()
+}
+#[proc_macro]
+pub fn type_name(item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::Type);
+    let name = input.to_token_stream().to_string();
+    quote! {
+        #name
+    }
+    .into()
 }
 
 #[cfg(test)]

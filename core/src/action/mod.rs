@@ -2,13 +2,14 @@
 //! Actions represent something that induces change in the current state of the engine, and also define
 //! a method of possibly undoing said change
 #![feature(associated_type_bounds)]
-use utils::exports::anyhow::{anyhow, Result};
+use ::common::exports::anyhow::{anyhow, Result};
+use ::common::uuid;
 use nvproc::{undo_action, Resource};
 use std::{
     any::Any,
     collections::{HashMap, VecDeque},
 };
-use utils::uuid;
+
 macro_rules! action {
     ($name:ident, $resource:ident,$param:ident) => {
         pub struct $name {
@@ -274,7 +275,7 @@ impl<'ac> Actman<'ac> {
         self.actions.clear();
     }
 }
-mod common;
+mod actions;
 pub mod request;
 #[cfg(test)]
 mod test;

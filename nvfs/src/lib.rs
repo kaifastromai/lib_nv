@@ -2,19 +2,64 @@
  * It is designed to be able to store and retrieve data from a .nv file, and to stream data from disk to memory, as needed.
  * It based on a sqlite database.
 */
-use rusqlite::Connection;
-use std::any::Any;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use utils::exports::{
-    anyhow::{anyhow, Result},
-    serde::*,
+
+#![feature(min_specialization)]
+use common::{
+    exports::{
+        anyhow::{anyhow, Result},
+        serde::de::DeserializeOwned,
+        serde::*,
+    },
+    type_id::{TypeId, TypeIdTy},
 };
 
-pub trait BinarySerializeTy: 'static {
+use nvproc::TypeId;
+use rusqlite::{types::Type, Connection};
+use std::any::Any;
+use std::collections::HashMap;
+use std::fs::*;
+use std::path::{Path, PathBuf};
+
+pub trait BinarySerdeTy: TypeIdTy + Serialize + DeserializeOwned {}
+
+impl<T: Serialize + DeserializeOwned + TypeIdTy> BinarySerdeTy for T {}
+pub trait BinaryTy: 'static {
     fn get_any(&self) -> &dyn Any;
 }
+impl<T> BinaryTy for T
+where
+    T: 'static + Serialize + Clone + TypeIdTy,
+{
+    fn get_any(&self) -> &dyn Any {
+        self
+    }
+}
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
+#[repr(C)]
+pub struct BinaryStorage {
+    pub component_type: TypeId,
+    component: Vec<u8>,
+}
+
+impl BinaryStorage {
+    pub fn new<T: BinarySerdeTy>(component: T) -> Self {
+        let data = bincode::serialize(&component).unwrap();
+        Self {
+            component: data,
+            component_type: T::get_type_id(),
+        }
+    }
+    pub fn from_bytes<T: BinarySerdeTy + DeserializeOwned>(data: &[u8]) -> Result<T> {
+        let bs: BinaryStorage = bincode::deserialize(data)?;
+        if bs.component_type != TypeId::of::<T>() {
+            return Err(anyhow!("TypeId mismatch"));
+        }
+        let component: T = bincode::deserialize(&bs.component)?;
+        Ok(component)
+    }
+}
 pub enum FsPath {
     ///The data is stored inside of a .nv file
     Internal(PathBuf),
@@ -131,7 +176,7 @@ pub struct DinodeData {
     pub children: Vec<u64>,
 }
 pub struct Vfs {
-    pub data: HashMap<u64, Box<dyn BinarySerializeTy>>,
+    pub data: HashMap<u64, Box<dyn BinaryTy>>,
     pub inodes: HashMap<u64, Inode>,
     pub node_used_list: Vec<u64>,
     pub data_used_list: Vec<u64>,
@@ -168,17 +213,16 @@ impl Vfs {
         let id = self.get_node_from_path_recursive(path_buf, 0)?;
         Ok(self.get_node(id))
     }
-    pub fn get_item_payload<T: BinarySerializeTy>(&self, id: u64) -> Result<&T> {
+    pub fn get_item_payload<T: BinaryTy>(&self, id: u64) -> Result<&T> {
         let data = self
             .data
             .get(&id)
             .ok_or_else(|| anyhow!("No data for id {}", id))?;
-        let any = data.get_any();
-        let any_ref: &dyn Any = any;
-        let any_ref_downcast: &T = any_ref
+        let any_ref = data
+            .get_any()
             .downcast_ref()
             .ok_or_else(|| anyhow!("Could not downcast to {}", std::any::type_name::<T>()))?;
-        Ok(any_ref_downcast)
+        Ok(any_ref)
     }
     pub fn get_node_mut_from_path(&mut self, path: PathBuf) -> Result<&mut Inode> {
         //skip root
@@ -191,7 +235,7 @@ impl Vfs {
         let id = self.get_node_from_path(path);
         id.is_ok()
     }
-    pub fn add_item<T: BinarySerializeTy + Serialize>(
+    pub fn add_item<T: BinaryTy + Serialize>(
         &mut self,
         item: T,
         path: PathBuf,
@@ -216,23 +260,23 @@ impl Vfs {
         Ok(())
     }
 
-    fn add_item_entry<T: BinarySerializeTy>(&mut self, item: T) -> u64 {
+    fn add_item_entry<T: BinaryTy>(&mut self, item: T) -> u64 {
         let id = self.new_item_id();
         self.data.insert(id, Box::new(item));
         id
     }
     fn new_item_id(&mut self) -> u64 {
-        let mut id = utils::uuid::gen_64();
+        let mut id = common::uuid::gen_64();
         while self.data_used_list.contains(&id) {
-            id = utils::uuid::gen_64();
+            id = common::uuid::gen_64();
         }
         self.data_used_list.push(id);
         id
     }
     fn new_node_id(&mut self) -> u64 {
-        let mut id = utils::uuid::gen_64();
+        let mut id = common::uuid::gen_64();
         while self.node_used_list.contains(&id) {
-            id = utils::uuid::gen_64();
+            id = common::uuid::gen_64();
         }
         self.node_used_list.push(id);
         id
@@ -345,11 +389,6 @@ impl Vfs {
         }
     }
 }
-impl<T: 'static> BinarySerializeTy for T {
-    fn get_any(&self) -> &dyn Any {
-        self
-    }
-}
 
 impl Default for Vfs {
     fn default() -> Self {
@@ -402,16 +441,28 @@ impl Nvfs {
 
 #[cfg(test)]
 mod test_super {
-    use rusqlite::params;
-
     use super::*;
-    #[derive(Serialize, Deserialize, Debug)]
-    #[serde(crate = "utils::exports::serde")]
+    use rusqlite::params;
+    use std::io::{Read, Write};
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[serde(crate = "common::exports::serde")]
     pub struct TestStruct {
         pub id: u32,
         pub name: String,
         pub description: String,
     }
+    // impl<T: 'static> BinarySerializeTy for T {
+    //     fn get_any(&self) -> &dyn Any {
+    //         self
+    //     }
+    // }
+
+    //implement BinarySerializeType for TestStruct
+    // impl BinarySerializeTy for TestStruct {
+    //     fn get_any(&self) -> &dyn Any {
+    //         self
+    //     }
+    // }
 
     #[test]
     fn test_serialize() {
@@ -521,5 +572,25 @@ mod test_super {
         assert_eq!(item2.id, 2);
 
         Ok(())
+    }
+    #[test]
+    fn test_serde() {
+        let ts = TestStruct {
+            id: 1,
+            name: String::from("test"),
+            description: String::from("test"),
+        };
+        let bs = BinaryStorage::new(ts);
+        let bytes = bincode::serialize(&bs).unwrap();
+        //write to disk
+        let mut file = File::create("test.struct").unwrap();
+        file.write_all(&bytes).unwrap();
+        //read from disk
+        let mut file = File::open("test.struct").unwrap();
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).unwrap();
+        let ts2 = BinaryStorage::from_bytes::<TestStruct>(&bytes).unwrap();
+        assert_eq!(ts2.id, 1);
+        assert_eq!(ts2.name, "test");
     }
 }
