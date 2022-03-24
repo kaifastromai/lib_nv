@@ -556,9 +556,9 @@ impl Storage {
 
         component_id
     }
-    pub fn insert_component_dyn(entity:Id,component:impl ComponentTy)->Result<()>{
-        let id=component.get_type_id();
-
+    pub fn insert_component_dyn(entity: Id, component: impl ComponentTy) -> Result<()> {
+        let id = component.get_type_id();
+        todo!();
     }
     pub fn insert_component<T: ComponentTy>(
         &mut self,
@@ -720,13 +720,7 @@ impl Storage {
         Ok(())
     }
     pub fn add_archetype<T: ArchetypeTy>(&mut self, archetype: &dyn ArchetypeTy) -> Result<()> {
-        let dat = archetype.consume();
-
-        for comp in dat {
-           
-        }
-
-        Ok(())
+        todo!()
     }
 }
 
@@ -793,8 +787,11 @@ impl Entman {
         ent.add_component::<T>()?;
         self.storage.insert_default::<T>(entity)
     }
-    pub fn add_archetype<T: component::archetypes::ArchetypeTy>(&mut self, archetype: T) {
-        self.storage.add_arczzhetype::<T>(archetype);z
+    pub fn add_archetype<T: component::archetypes::ArchetypeTy>(
+        &mut self,
+        archetype: T,
+    ) -> Result<()> {
+        todo!()
     }
     pub fn get_entity_ref(&self, entity: Id) -> Option<EntityRef> {
         Some(EntityRef {

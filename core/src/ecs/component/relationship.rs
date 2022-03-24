@@ -2,6 +2,8 @@ use super::super::*;
 use nvproc::Component;
 use petgraph::graph::*;
 use petgraph::visit::*;
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum ERelationship {
     MajorMinor(Major, Minor),
     Symmetric(Symmetric),
@@ -11,41 +13,62 @@ impl ERelationship {
         ERelationship::MajorMinor(Major::Parent(parent), Minor::Child(child))
     }
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
+
 pub enum Major {
     Parent(Parent),
     Custom(Custom),
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub struct Custom {
     pub name: String,
     pub description: String,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum Minor {
     Child(Child),
     Custom(Custom),
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum Symmetric {
     Friend,
     Enemy,
     Sibling,
+    Spouse,
     Custom(Custom),
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum Parent {
     Mother,
     Father,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum Child {
     Daughter,
     Son,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum Sibling {
     Sister,
     Brother,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 pub enum Spouse {
     Husband,
     Wife,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "common::exports::serde")]
 
 pub struct Relationship {
     pub relationship_name: String,
@@ -73,6 +96,27 @@ impl Relationship {
     pub fn get_minor_pair(&self) -> Id {
         self.pairs.1
     }
+    pub fn parent_child<T, U>(parent: T, child: U, parent_id: Id, child_id: Id) -> Self
+    where
+        T: Into<Parent>,
+        U: Into<Child>,
+    {
+        Self::new(
+            String::from("ParentChild"),
+            ERelationship::parent_child(parent.into(), child.into()),
+            (parent_id, child_id),
+        )
+    }
+    pub fn symmetric<T>(relation: T, first: Id, second: Id) -> Self
+    where
+        T: Into<Symmetric>,
+    {
+        Self::new(
+            String::from("Symmetric"),
+            ERelationship::Symmetric(relation.into()),
+            (first, second),
+        )
+    }
 }
 pub struct RelationshipGraph {
     pub graph: DiGraph<Id, Relationship>,
@@ -94,6 +138,8 @@ impl RelationshipGraph {
 }
 #[cfg(test)]
 mod test_relationship {
+    use std::{fs::File, io::Write};
+
     use super::*;
 
     #[test]
@@ -124,5 +170,21 @@ mod test_relationship {
 
         graph.graph.add_edge(n1, n2, father);
         graph.graph.add_edge(n3, n2, mother);
+    }
+    #[test]
+    fn test_serialize_json() {
+        let relationship_test = Relationship::new(
+            "test".to_string(),
+            ERelationship::MajorMinor(Major::Parent(Parent::Mother), Minor::Child(Child::Son)),
+            (uuid::gen_128(), uuid::gen_128()),
+        );
+        let siblings =
+            Relationship::symmetric(Symmetric::Sibling, uuid::gen_128(), uuid::gen_128());
+        let serialized_test = serde_json::to_string(&relationship_test).unwrap();
+        let serialized_siblings = serde_json::to_string(&siblings).unwrap();
+        //write to file
+        let mut file = File::create("./test.json").unwrap();
+        file.write_all(serialized_test.as_bytes()).unwrap();
+        file.write_all(serialized_siblings.as_bytes()).unwrap();
     }
 }

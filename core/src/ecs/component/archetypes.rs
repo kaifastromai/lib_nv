@@ -31,22 +31,26 @@ macro_rules! archetype {
     ( $($signature:tt),* ) => {};
 }
 pub struct ArchetypeDescriptor {
-    components: Vec<TypeId>,
+    signature: Vec<TypeId>,
+    //A Json object that describes the archetype
+    description: String,
 }
 impl ArchetypeDescriptor {
     pub fn new_empty() -> Self {
         Self {
-            components: Vec::new(),
+            signature: Vec::new(),
+            description: String::new(),
         }
     }
     pub fn new(components: Vec<impl ComponentTypeIdTy>) -> Self {
         Self {
-            components: components.iter().map(|c| c.get_type_id_ref()).collect(),
+            signature: components.iter().map(|c| c.get_type_id_ref()).collect(),
+            description: String::new(),
         }
     }
 
     pub fn with_component<T: ComponentTypeIdTy>(mut self) -> Self {
-        self.components.push(TypeId::of::<T>());
+        self.signature.push(TypeId::of::<T>());
         self
     }
 }
@@ -67,33 +71,21 @@ pub struct CharacterArchetype {
     archetype_name: &'static str,
     data: Vec<Box<dyn ComponentTy>>,
 }
+pub struct Archetype<T: ArchetypeTy> {
+    archetype: T,
+}
 impl ArchetypeTy for CharacterArchetype {
     fn describe(&self) -> ArchetypeDescriptor {
-        let descriptor = ArchetypeDescriptor::new(arch_sig!(Field, Field, Field, Field));
+        let descriptor = ArchetypeDescriptor::new(arch_sig!(
+            StringField,
+            StringField,
+            StringField,
+            StringField
+        ));
         descriptor
     }
     fn consume(mut self) -> Vec<Box<dyn ComponentTy>> {
-        let name = Field {
-            name: String::from("name"),
-            value: String::from(""),
-        };
-        self.data.push(Box::new(name));
-        let description = Field {
-            name: String::from("description"),
-            value: String::from(""),
-        };
-        self.data.push(Box::new(description));
-        let age = Field {
-            name: String::from("age"),
-            value: String::from(""),
-        };
-        self.data.push(Box::new(age));
-        let height = Field {
-            name: String::from("height"),
-            value: String::from(""),
-        };
-        self.data.push(Box::new(height));
-        self.data
+        todo!()
     }
 }
 

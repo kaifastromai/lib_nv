@@ -19,7 +19,7 @@ impl ContextInternal {
         field_name: String,
         field_value: String,
     ) {
-        let field_comp = nvcore::ecs::component::Field {
+        let field_comp = nvcore::ecs::component::StringField {
             name: field_name,
             value: field_value,
         };
@@ -32,15 +32,15 @@ impl ContextInternal {
             .map(|id| ffi::Id::from_internal_id(*id))
             .collect()
     }
-    pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::Field {
+    pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::StringField {
         let field_comp = self
             .mir
-            .get_component_with_id::<Field>(field_id.into())
+            .get_component_with_id::<StringField>(field_id.into())
             .unwrap();
         //convert to raw pointer
         let field_comp_ptr = std::ptr::addr_of!(field_comp.component);
         //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const Field, *mut ffi::Field>(field_comp_ptr) }
+        unsafe { std::mem::transmute::<*const StringField, *mut ffi::StringField>(field_comp_ptr) }
     }
     pub fn get_name_component_with_id(&self, name_id: ffi::Id) -> *mut ffi::Name {
         let name_comp = self
@@ -54,14 +54,15 @@ impl ContextInternal {
     }
     //Video component
     pub fn get_binary_component_with_id(&self, video_id: ffi::Id) -> *mut ffi::BinaryData {
-        let video_comp = self
-            .mir
-            .get_component_with_id::<BinaryData>(video_id.into())
-            .unwrap();
-        //convert to raw pointer
-        let video_comp_ptr = std::ptr::addr_of!(video_comp.component);
-        //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const BinaryData, *mut ffi::BinaryData>(video_comp_ptr) }
+        // let video_comp = self
+        //     .mir
+        //     .get_component_with_id::<BinaryData>(video_id.into())
+        //     .unwrap();
+        // //convert to raw pointer
+        // let video_comp_ptr = std::ptr::addr_of!(video_comp.component);
+        // //#We know that the memory layout ought to be the same as the C++ struct
+        // unsafe { std::mem::transmute::<*const BinaryData, *mut ffi::BinaryData>(video_comp_ptr) }
+        todo!()
     }
 }
 pub fn new_ctx() -> *mut ContextInternal {
@@ -116,7 +117,7 @@ mod ffi {
     }
 
     #[namespace = "components"]
-    pub struct Field {
+    pub struct StringField {
         pub name: String,
         pub value: String,
     }
@@ -156,7 +157,7 @@ mod ffi {
         pub fn to_string(self: &Id) -> String;
         pub fn get_all_living_entities(&self) -> Vec<Id>;
         pub unsafe fn drop(ctx: *mut ContextInternal);
-        pub fn get_field_component_with_id(&self, field_id: Id) -> *mut Field;
+        pub fn get_field_component_with_id(&self, field_id: Id) -> *mut StringField;
 
     }
 }

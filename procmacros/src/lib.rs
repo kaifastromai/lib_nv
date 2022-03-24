@@ -203,6 +203,7 @@ pub fn type_id_derive(input: TokenStream) -> TokenStream {
     name.to_string().hash(&mut hasher);
     let hash_id = hasher.finish();
     let struct_impl = quote! {
+
         impl TypeIdTy for #name{
             fn get_type_id()->TypeId{
                 TypeId::new(#hash_id)
@@ -281,7 +282,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     input.attrs.append(
         &mut syn::Attribute::parse_outer
             .parse2(quote! {
-                #[derive(Component, Default,TypeId)]
+                #[derive(Component, Default,nvproc::TypeId)]
                 #[repr(C)]
             })
             .unwrap(),
