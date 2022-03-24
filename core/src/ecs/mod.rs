@@ -1,5 +1,6 @@
 pub mod component;
 pub mod prelude;
+mod tests;
 use self::component::archetypes::ArchetypeTy;
 
 use super::*;

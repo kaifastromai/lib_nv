@@ -1,5 +1,6 @@
 pub mod archetypes;
 pub mod relationship;
+use common::exports::serde::*;
 use common::type_id::*;
 
 use std::{
@@ -48,6 +49,7 @@ pub struct Image {
     image_data: PathBuf,
 }
 
+#[nvproc::serde_derive]
 pub enum EGender {
     Male,
     Female,
@@ -61,6 +63,10 @@ impl Default for EGender {
 }
 
 #[component]
+pub struct Age {
+    age: f32,
+}
+#[component]
 pub struct Gender {
     pub gender: EGender,
 }
@@ -71,6 +77,7 @@ pub struct Name {
     pub aliases: Vec<String>,
 }
 #[derive(Default)]
+#[nvproc::serde_derive]
 pub struct CharacterNameFormat {
     pub given_name: String,
     pub other_names: Vec<String>,

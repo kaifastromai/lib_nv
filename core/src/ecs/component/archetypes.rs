@@ -33,19 +33,20 @@ macro_rules! archetype {
 pub struct ArchetypeDescriptor {
     signature: Vec<TypeId>,
     //A Json object that describes the archetype
-    description: String,
+    json_descriptor: String,
+
 }
 impl ArchetypeDescriptor {
     pub fn new_empty() -> Self {
         Self {
             signature: Vec::new(),
-            description: String::new(),
+            json_descriptor: String::new(),
         }
     }
     pub fn new(components: Vec<impl ComponentTypeIdTy>) -> Self {
         Self {
             signature: components.iter().map(|c| c.get_type_id_ref()).collect(),
-            description: String::new(),
+            json_descriptor: String::new(),
         }
     }
 

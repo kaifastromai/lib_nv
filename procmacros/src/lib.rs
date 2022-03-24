@@ -2,11 +2,13 @@
 use proc_macro::{Diagnostic, Level, TokenStream};
 use proc_macro2 as pm2;
 use quote::{format_ident, quote, ToTokens, __private::Span};
-use std::hash::*;
+use std::{fs::File, hash::*, io::Read};
 use syn::{
     parse::{Parse, Parser},
     parse_macro_input, DeriveInput, Field,
 };
+const SERDE_EXPORT_PATH: &str = "common::exports::serde";
+
 trait StringExt {
     fn to_snake_case(&self) -> String;
 }
@@ -279,11 +281,13 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::ItemStruct);
+
     input.attrs.append(
         &mut syn::Attribute::parse_outer
             .parse2(quote! {
                 #[derive(Component, Default,nvproc::TypeId)]
                 #[repr(C)]
+                #[nvproc::serde_derive]
             })
             .unwrap(),
     );
@@ -524,20 +528,35 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
 //Adds serde's Serialize and Deserialize derive macros to the given struct,
 //and optionally accept an additional parameter to specify the crate name
 #[proc_macro_attribute]
-pub fn serde_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let crate_name: pm2::TokenStream = attr.into();
-    let mut input = syn::parse_macro_input!(item as syn::ItemStruct);
+pub fn serde_derive(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut input = syn::parse_macro_input!(item as syn::Item);
     let derive_attr = quote! {
         #[derive(Serialize,Deserialize)]
-        #[serde(crate = #crate_name)]
+        #[serde(crate = #SERDE_EXPORT_PATH)]
     };
-    input.attrs.append(
-        &mut syn::Attribute::parse_outer
-            .parse2(quote! {
-               #derive_attr
-            })
-            .unwrap(),
-    );
+
+    match input {
+        syn::Item::Struct(ref mut s) => {
+            s.attrs.append(
+                &mut syn::Attribute::parse_outer
+                    .parse2(quote! {
+                       #derive_attr
+                    })
+                    .unwrap(),
+            );
+        }
+        syn::Item::Enum(ref mut e) => {
+            e.attrs.append(
+                &mut syn::Attribute::parse_outer
+                    .parse2(quote! {
+                       #derive_attr
+                    })
+                    .unwrap(),
+            );
+        }
+        _ => {}
+    }
+
     input.into_token_stream().into()
 }
 #[proc_macro]
@@ -549,13 +568,26 @@ pub fn type_name(item: TokenStream) -> TokenStream {
     }
     .into()
 }
+#[proc_macro]
+pub fn build_archetype_descriptor(item: TokenStream) -> TokenStream {
+    todo!()
+}
+///Takes a path to a file, and outputs result as static string
+#[proc_macro]
+pub fn file_to_static_string(file: TokenStream) -> TokenStream {
+    //interpret item as a string literal
+    let input = syn::parse_macro_input!(file as syn::LitStr);
+    let path = input.value();
+    let mut file = File::open(path).expect("Failed to open file");
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .expect("Failed to read file");
+    let contents = syn::LitStr::new(&contents, Span::call_site());
+    quote! {
+        #contents
+    }
+    .into()
+}
 
 #[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}
+mod tests;
