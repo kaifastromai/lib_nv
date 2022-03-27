@@ -183,7 +183,7 @@ mod test_relationship {
         let serialized_test = serde_json::to_string(&relationship_test).unwrap();
         let serialized_siblings = serde_json::to_string(&siblings).unwrap();
         //write to file
-        let mut file = File::create("./test.json").unwrap();
+        let mut file = File::create("./ecs_test_output/test.json").unwrap();
         file.write_all(serialized_test.as_bytes()).unwrap();
         file.write_all(serialized_siblings.as_bytes()).unwrap();
     }
