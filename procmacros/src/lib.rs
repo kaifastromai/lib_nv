@@ -236,12 +236,26 @@ pub fn generate_component_types(_attr: TokenStream, item: TokenStream) -> TokenS
         use crate::ecs::component::components::*;
         //This is simply an enum that lists all the component types
         #[derive(Debug,Clone)]
+        #[nvproc::serde_derive]
         pub enum EComponentTypes{
             #(#comp_type_idents,)*
         }
         //This is an enum that lists and owns all the component types
+        #[nvproc::serde_derive]
+
         pub enum EComponentGraphTypes{
             #(#comp_type_idents(#comp_type_idents),)*
+        }
+        impl EComponentGraphTypes{
+           ///This inserts the component this enum owns into the storage.
+            pub fn insert_component_into_storage(self, storage:&mut crate::ecs::Storage, owning_entity:crate::ecs::Id){
+                match self{
+                    #(Self::#comp_type_idents(comp_type)=>{
+                        storage.insert_component(owning_entity,comp_type);
+                    },)*
+                }
+
+            }
         }
        impl TypeIdTy for EComponentGraphTypes{
             fn get_type_id_ref(&self)->TypeId{

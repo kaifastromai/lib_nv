@@ -52,6 +52,7 @@ fn test_get_component() {
     assert_eq!(field_comp.name, String::default());
     assert_eq!(field_comp.value, String::default());
 }
+#[test]
 fn test_get_components() {
     let mut em = Entman::new();
     let entity = em.add_entity();
@@ -73,4 +74,17 @@ fn test_get_components() {
             },
         )
         .unwrap();
+}
+#[test]
+fn test_add_archetype() {
+    let character_archetype = archetypes::CharacterArchetype {};
+    let mut em = Entman::new();
+    let entity = em.entity_from_archetype(character_archetype);
+    let entity=em.get_entity(entity);
+    //compare signatures
+    assert_eq!(
+        character_archetype.describe().get_signature(),
+        entity.get_signature()
+    );
+
 }

@@ -181,20 +181,4 @@ mod test_relationship {
         graph.graph.add_edge(n1, n2, father);
         graph.graph.add_edge(n3, n2, mother);
     }
-    #[test]
-    fn test_serialize_json() {
-        let relationship_test = Relationship::new(
-            "test".to_string(),
-            ERelationship::MajorMinor(Major::Parent(Parent::Mother), Minor::Child(Child::Son)),
-            (uuid::gen_128(), uuid::gen_128()),
-        );
-        let siblings =
-            Relationship::symmetric(Symmetric::Sibling, uuid::gen_128(), uuid::gen_128());
-        let serialized_test = serde_json::to_string(&relationship_test).unwrap();
-        let serialized_siblings = serde_json::to_string(&siblings).unwrap();
-        //write to file
-        let mut file = File::create("./ecs_test_output/test.json").unwrap();
-        file.write_all(serialized_test.as_bytes()).unwrap();
-        file.write_all(serialized_siblings.as_bytes()).unwrap();
-    }
 }

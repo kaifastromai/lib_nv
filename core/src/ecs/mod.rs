@@ -1,7 +1,7 @@
 pub mod component;
 pub mod prelude;
 mod tests;
-use self::component::archetypes::ArchetypeTy;
+use self::component::archetypes::{Archetype, ArchetypeTy};
 
 use super::*;
 use crate::ecs::component::*;
@@ -96,40 +96,61 @@ impl ComponentTy for () {
     fn clean(&mut self) {}
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct EntityComponent {
-    pub type_id: TypeId,
-    pub count: usize,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[nvproc::serde_derive]
+pub struct Signature(Vec<TypeId>);
+impl Signature {
+    pub fn new() -> Self {
+        Signature(Vec::new())
+    }
+    pub fn add(&mut self, type_id: TypeId) {
+        self.0.push(type_id);
+    }
+    pub fn get_type_ids(&self) -> &Vec<TypeId> {
+        &self.0
+    }
+    pub fn get_type_ids_mut(&mut self) -> &mut Vec<TypeId> {
+        &mut self.0
+    }
+    //remove the first occurence of type_id
+    pub fn remove_component(&mut self, type_id: TypeId) -> Result<()> {
+        let index = self
+            .0
+            .iter()
+            .position(|&x| x == type_id)
+            .ok_or(anyhow!("Could not find component type {:?}", type_id))?;
+        self.0.remove(index);
+        Ok(())
+    }
+    pub fn contains(&self, type_id: TypeId) -> bool {
+        self.0.contains(&type_id)
+    }
+}
+impl From<Vec<TypeId>> for Signature {
+    fn from(vec: Vec<TypeId>) -> Self {
+        Signature(vec)
+    }
 }
 
-//implement From<TypeID> for EntityComponent
-impl From<TypeId> for EntityComponent {
-    fn from(type_id: TypeId) -> Self {
-        EntityComponent { type_id, count: 0 }
-    }
-} //implement PartialOrd for EntityComponent
-impl PartialOrd for EntityComponent {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.count.cmp(&other.count))
-    }
-}
-impl Ord for EntityComponent {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.count.cmp(&other.count)
-    }
-}
 #[derive(Debug, Clone)]
 pub struct Entity {
     id: Id,
     is_alive: bool,
-    components: Option<Vec<TypeId>>,
+    components: Signature,
 }
 impl Entity {
     pub fn new(id: Id) -> Self {
         Self {
             id,
             is_alive: true,
-            components: None,
+            components: Signature::new(),
+        }
+    }
+    pub fn from_sig(id: Id, sig: Signature) -> Self {
+        Self {
+            id,
+            is_alive: true,
+            components: sig,
         }
     }
     pub fn is_valid(&self) -> bool {
@@ -140,57 +161,24 @@ impl Entity {
     }
     pub fn add_component<T: ComponentTy>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
-        match self.components.as_mut() {
-            Some(c) => {
-                c.push(tid);
-            }
-            None =>
-            //if no components, create a new vec
-            {
-                self.components = Some(vec![tid]);
-            }
-        }
+        self.components.add(tid);
 
         Ok(())
     }
     pub fn remove_component<T: ComponentTy>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
-        //remove the fisrt occurence of the type
-        match self.components.as_mut() {
-            Some(c) => {
-                let index = c.iter().position(|&x| x == tid).ok_or(anyhow!(
-                    "Entity {} has no component of type {}",
-                    self.id,
-                    std::any::type_name::<T>()
-                ))?;
-                c.remove(index);
-            }
-            None => {
-                return Err(anyhow!("Entity {} has no components", self.id));
-            }
-        }
+        self.components.remove_component(tid)?;
         Ok(())
     }
     pub fn has_component<T: ComponentTy>(&self) -> bool {
         let tid = TypeId::of::<T>();
-        match &self.components {
-            Some(c) => c.contains(&tid),
-            None => false,
-        }
+        self.components.contains(tid)
     }
-    pub fn get_signature(&self) -> Vec<TypeId> {
-        self.components.as_ref().unwrap().clone()
+    pub fn get_signature(&self) -> Signature {
+        self.components.clone()
     }
-    pub fn get_signature_ref(&self) -> &Vec<TypeId> {
-        &self.components.as_ref().unwrap()
-    }
-    pub fn get_signature_str(&self) -> String {
-        let mut signature = String::new();
-        for tid in self.components.as_ref().unwrap().iter() {
-            signature.push_str(std::any::type_name::<TypeId>());
-            signature.push_str(" ");
-        }
-        signature
+    pub fn get_signature_ref(&self) -> &Signature {
+        &self.components
     }
 }
 
@@ -213,6 +201,7 @@ pub trait CommonComponentStoreTy: 'static {
     fn get_type_id(&self) -> TypeId;
     fn get_any(&self) -> &dyn Any;
     fn get_any_mut(&mut self) -> &mut dyn Any;
+    fn insert_dyn(&mut self, id: Id, component: Box<dyn ComponentTy>) -> Result<()>;
 }
 impl dyn CommonComponentStoreTy {
     fn get_type_name(&self) -> &'static str {
@@ -238,6 +227,9 @@ impl<T: ComponentTy> CommonComponentStoreTy for CommonComponentStore<T> {
     }
     fn get_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+    fn insert_dyn(&mut self, id: Id, component: Box<dyn ComponentTy>) -> Result<()> {
+        todo!()
     }
 }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -440,6 +432,13 @@ impl<T: ComponentTy> CommonComponentStore<T> {
         }
         Ok(id)
     }
+    pub fn insert_dyn(
+        &mut self,
+        owning_entity: Id,
+        component: impl ComponentTy,
+    ) -> Result<ComponentId> {
+        todo!()
+    }
 
     //Marks this component as orphaned, and as a candiate to be reparented
     //It is the responsibility of the caller to ensure that the owning entity removes the component!
@@ -559,8 +558,7 @@ impl Storage {
         component_id
     }
     pub fn insert_component_dyn(entity: Id, component: impl ComponentTy) -> Result<()> {
-        let id = component.get_type_id();
-        todo!();
+        todo!()
     }
     pub fn insert_component<T: ComponentTy>(
         &mut self,
@@ -721,9 +719,6 @@ impl Storage {
         component.owning_entity = Some(new_parent);
         Ok(())
     }
-    pub fn add_archetype<T: ArchetypeTy>(&mut self, archetype: &dyn ArchetypeTy) -> Result<()> {
-        todo!()
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -768,6 +763,20 @@ impl Entman {
         self.entities.insert(ent, Entity::new(ent));
         ent
     }
+    //Creates a new entity from an archetype
+    pub fn entity_from_archetype<T: ArchetypeTy>(&mut self, archetype: T) -> Id {
+        let ent = uuid::gen_128();
+        let desc = archetype.describe();
+        let sig = desc.get_signature();
+        self.entities.insert(ent, Entity::from_sig(ent, sig));
+        let entity_mut = self.get_entity_mut(ent).unwrap();
+
+        for c in desc.take_components().into_iter() {
+            c.insert_component_into_storage(&mut self.storage, ent);
+        }
+
+        ent
+    }
     //Removes the entity from the entity manager, and marks all it's components as orphaned.
 
     pub fn remove_entity(&mut self, entity: Id) {}
@@ -788,12 +797,6 @@ impl Entman {
         let ent = self.entities.get_mut(&entity).unwrap();
         ent.add_component::<T>()?;
         self.storage.insert_default::<T>(entity)
-    }
-    pub fn add_archetype<T: component::archetypes::ArchetypeTy>(
-        &mut self,
-        archetype: T,
-    ) -> Result<()> {
-        todo!()
     }
     pub fn get_entity_ref(&self, entity: Id) -> Option<EntityRef> {
         Some(EntityRef {

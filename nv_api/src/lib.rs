@@ -36,7 +36,7 @@ impl ContextInternal {
             .map(|id| ffi::Id::from_internal_id(*id))
             .collect()
     }
-    pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::StringField {
+    pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::StringFieldComponent {
         let field_comp = self
             .mir
             .get_component_with_id::<StringFieldComponent>(field_id.into())
@@ -44,7 +44,11 @@ impl ContextInternal {
         //convert to raw pointer
         let field_comp_ptr = std::ptr::addr_of!(field_comp.component);
         //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const StringFieldComponent, *mut ffi::StringField>(field_comp_ptr) }
+        unsafe {
+            std::mem::transmute::<*const StringFieldComponent, *mut ffi::StringFieldComponent>(
+                field_comp_ptr,
+            )
+        }
     }
     pub fn get_name_component_with_id(&self, name_id: ffi::Id) -> *mut ffi::NameComponent {
         let name_comp = self
@@ -163,7 +167,7 @@ mod ffi {
         pub fn to_string(self: &Id) -> String;
         pub fn get_all_living_entities(&self) -> Vec<Id>;
         pub unsafe fn drop(ctx: *mut ContextInternal);
-        pub fn get_field_component_with_id(&self, field_id: Id) -> *mut StringField;
+        pub fn get_field_component_with_id(&self, field_id: Id) -> *mut StringFieldComponent;
 
     }
 }
