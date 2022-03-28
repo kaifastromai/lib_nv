@@ -89,6 +89,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "components_track"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+]
+
+[[package]]
 name = "csl"
 version = "0.1.0"
 
@@ -354,6 +361,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "common",
+ "components_track",
  "dyn-clone",
  "lazy_static",
  "linkme",
@@ -377,6 +385,7 @@ dependencies = [
 name = "nvproc"
 version = "0.1.0"
 dependencies = [
+ "components_track",
  "proc-macro2",
  "quote",
  "syn",

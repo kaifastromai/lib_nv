@@ -1,7 +1,11 @@
 //Archetypes map to bevy's bundles
 
-use crate::ecs::component::*;
+use crate::ecs::component::components::*;
+use crate::ecs::component::relationship::*;
 use crate::ecs::*;
+use nvproc::arch_sig;
+
+use super::relationship::Relationship;
 struct SigType<T: ComponentTypeIdTy> {
     phantom: std::marker::PhantomData<T>,
 }
@@ -13,40 +17,31 @@ impl<T: ComponentTypeIdTy> SigType<T> {
     }
 }
 
-macro_rules! arch_sig {
-    ($($comp:ident),*) => {
-        {
-            let mut sig=Vec::<ComponentTypeId>::new();
-            $(
-                let sigtype=SigType::<$comp>{phantom:std::marker::PhantomData};
-                sig.push(sigtype.into_type_id());
-            )*
-            sig
-        }
-    };
-}
-
 //An archetype is an entity that has a predefined set of components
 macro_rules! archetype {
     ( $($signature:tt),* ) => {};
 }
+
+pub struct ArchetypeGraph {
+    pub sig: Vec<String>,
+    pub name: String,
+}
+
 pub struct ArchetypeDescriptor {
     signature: Vec<TypeId>,
-    //A Json object that describes the archetype
-    json_descriptor: String,
-
+    components: Vec<EComponentGraphTypes>,
 }
 impl ArchetypeDescriptor {
     pub fn new_empty() -> Self {
         Self {
             signature: Vec::new(),
-            json_descriptor: String::new(),
+            components: Vec::new(),
         }
     }
-    pub fn new(components: Vec<impl ComponentTypeIdTy>) -> Self {
+    pub fn new(components: Vec<EComponentGraphTypes>) -> Self {
         Self {
             signature: components.iter().map(|c| c.get_type_id_ref()).collect(),
-            json_descriptor: String::new(),
+            components,
         }
     }
 
@@ -66,7 +61,7 @@ impl<T: ComponentTypeIdTy> From<T> for SigType<T> {
 
 pub trait ArchetypeTy {
     fn describe(&self) -> ArchetypeDescriptor;
-    fn consume(self) -> Vec<Box<dyn ComponentTy>>;
+    fn consume(&self) -> Vec<Box<dyn ComponentTy>>;
 }
 pub struct CharacterArchetype {
     archetype_name: &'static str,
@@ -77,15 +72,49 @@ pub struct Archetype<T: ArchetypeTy> {
 }
 impl ArchetypeTy for CharacterArchetype {
     fn describe(&self) -> ArchetypeDescriptor {
-        let descriptor = ArchetypeDescriptor::new(arch_sig!(
-            StringField,
-            StringField,
-            StringField,
-            StringField
-        ));
+        let descriptor = ArchetypeDescriptor::new(arch_sig!([
+            CharacterNameComponent {
+                name: CharacterNameFormat {
+                    given_name: "Given name".to_string(),
+                    other_names: Vec::new(),
+                    family_name: "Family name".to_string()
+                },
+                aliases: Vec::new()
+            },
+            NumericalFieldComponent {
+                name: "Age".to_string(),
+                value: 0.0
+            },
+            NumericalFieldComponent {
+                name: "Height".to_string(),
+                value: 0.0
+            },
+            NumericalFieldComponent {
+                name: "Weight".to_string(),
+                value: 0.0
+            },
+            RelationshipComponent {
+                relationship: Relationship::new(
+                    "Mother".to_string(),
+                    ERelationship::parent_child(Parent::Mother, Child::Son),
+                    (0, 0)
+                )
+            },
+            RelationshipComponent {
+                relationship: Relationship::new(
+                    "Father".to_string(),
+                    ERelationship::parent_child(Parent::Father, Child::Son),
+                    (0, 0)
+                )
+            },
+            StringFieldComponent {
+                name: "Description".to_string(),
+                value: "".to_string()
+            },
+        ]));
         descriptor
     }
-    fn consume(mut self) -> Vec<Box<dyn ComponentTy>> {
+    fn consume(&self) -> Vec<Box<dyn ComponentTy>> {
         todo!()
     }
 }

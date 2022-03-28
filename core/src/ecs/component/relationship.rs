@@ -9,8 +9,13 @@ pub enum ERelationship {
     Symmetric(Symmetric),
 }
 impl ERelationship {
-    fn parent_child(parent: Parent, child: Child) -> Self {
+    pub fn parent_child(parent: Parent, child: Child) -> Self {
         ERelationship::MajorMinor(Major::Parent(parent), Minor::Child(child))
+    }
+}
+impl Default for ERelationship {
+    fn default() -> Self {
+        ERelationship::Symmetric(Symmetric::default())
     }
 }
 
@@ -42,6 +47,11 @@ pub enum Symmetric {
     Spouse,
     Custom(Custom),
 }
+impl Default for Symmetric {
+    fn default() -> Self {
+        Symmetric::Friend
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "common::exports::serde")]
@@ -67,7 +77,7 @@ pub enum Spouse {
     Husband,
     Wife,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(crate = "common::exports::serde")]
 
 pub struct Relationship {

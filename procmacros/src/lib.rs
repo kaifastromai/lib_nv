@@ -8,6 +8,7 @@ use syn::{
     parse_macro_input, DeriveInput, Field,
 };
 const SERDE_EXPORT_PATH: &str = "common::exports::serde";
+use components_track::comp_link::COMPONENTS;
 
 trait StringExt {
     fn to_snake_case(&self) -> String;
@@ -156,7 +157,7 @@ pub fn undo_action(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &item.sig.ident;
 
     //get the function return type
-    let ret_type = &item.sig.output;
+    let _ret_type = &item.sig.output;
     //get the function body
     let body = &item.block;
     let new_decl = quote! {
@@ -171,15 +172,7 @@ pub fn undo_action(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn action_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    //action is of the form Action<'a,R:ResrcTy,P:ParamTy>
-    //get the type parameters
-    let mut type_params = input.generics.params.iter();
-    //get the first type parameter
-    let life_time_param = type_params.next();
-    //get the second type parameter
-    let resource_param = type_params.next();
-    //get the third type parameter
-    let param_param = type_params.next();
+
     let struct_impl = quote! {
         impl<'a,R:ResrcTy,P:ParamTy> ActionTy for #name<'a,R,P>{
             fn exec(&mut self, mir:&mut Mir)->Result<Box<dyn ResrcTy>>{
@@ -193,6 +186,78 @@ pub fn action_derive(input: TokenStream) -> TokenStream {
     };
 
     struct_impl.into()
+}
+
+//Takes a comma seperated list of Component structs with predefined fields and generates a vector of EComponentGraphType
+#[proc_macro]
+pub fn arch_sig(item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::ExprArray);
+    let mut enum_exprs: Vec<pm2::TokenStream> = Vec::new();
+
+    //iterate through all struct expressions
+    for expr in item.elems {
+        if let syn::Expr::Struct(s) = expr {
+            let expr_name = s.path.segments.last().unwrap();
+            let enum_expr = quote! {
+               EComponentGraphTypes::#expr_name(#s)
+            };
+            enum_exprs.push(enum_expr);
+        }
+    }
+    quote! {
+        vec![#(#enum_exprs),*]
+    }
+    .into()
+}
+
+///Procedural macro that generates an enum of ComponentTypes by looping through the AST for
+/// all instances of the ComponentType attribute
+#[proc_macro_attribute]
+pub fn generate_component_types(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    //iterate over all items in the stream
+    let items = parse_macro_input!(item as syn::ItemMod);
+    let mut comp_type_idents: Vec<syn::Ident> = Vec::new();
+    let content = items.content.as_ref().unwrap();
+
+    for item in content.1.iter() {
+        if let syn::Item::Struct(s) = item {
+            //get attributes
+            let mut attrs = s.attrs.iter();
+            //check if one of the attribs is "component"
+            if attrs.any(|attr| attr.path.is_ident("component")) {
+                //get the name of the struct
+                let name = &s.ident;
+                //add the name to the list of component types
+                comp_type_idents.push(name.clone());
+            }
+        }
+    }
+    let comp_types_enum = quote! {
+        use crate::ecs::component::components::*;
+        //This is simply an enum that lists all the component types
+        #[derive(Debug,Clone)]
+        pub enum EComponentTypes{
+            #(#comp_type_idents,)*
+        }
+        //This is an enum that lists and owns all the component types
+        pub enum EComponentGraphTypes{
+            #(#comp_type_idents(#comp_type_idents),)*
+        }
+       impl TypeIdTy for EComponentGraphTypes{
+            fn get_type_id_ref(&self)->TypeId{
+                match self{
+                    #(Self::#comp_type_idents(t)=>t.get_type_id_ref(),)*
+                }
+            }
+        }
+    };
+
+    //  let mut comp_type_strings = comp_type_strings.into_iter();
+    quote! {
+       #comp_types_enum
+        #items
+    }
+    .into()
 }
 
 ///Computes a 64bit type_id based on the hash of the name of the type
@@ -212,6 +277,12 @@ pub fn type_id_derive(input: TokenStream) -> TokenStream {
             }
             fn get_type_id_ref(&self)->TypeId{
                 TypeId::new(#hash_id)
+            }
+            fn get_name()->&'static str{
+                stringify!(#name)
+            }
+            fn get_name_ref(&self)->&'static str{
+                stringify!(#name)
             }
         }
         impl crate::ecs::ComponentTypeIdTy for #name{}
@@ -279,8 +350,13 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
 }
 ///Decorates the item with the necessary derives and such for the component
 #[proc_macro_attribute]
-pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::ItemStruct);
+    let name = &input.ident;
+    let name_ident_caps = name.to_string().to_uppercase();
+    //convert to ident
+    let name_ident = syn::Ident::new(&name_ident_caps, name.span());
+    let name_str = name.to_string();
 
     input.attrs.append(
         &mut syn::Attribute::parse_outer
@@ -288,10 +364,13 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #[derive(Component, Default,nvproc::TypeId)]
                 #[repr(C)]
                 #[nvproc::serde_derive]
+
             })
             .unwrap(),
     );
     quote! {
+        #[distributed_slice(COMPONENTS)]
+        pub static #name_ident: &'static str =#name_str;
         #input
     }
     .into()

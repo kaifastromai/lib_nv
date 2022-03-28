@@ -14,3 +14,4 @@ syn = { version = "*", features = ["derive", "full", "printing"] }
 quote = "*"
 proc-macro2 = "*"
 uuid = { version = "*", features = ["serde", "v5"] }
+components_track = { path = "../components_track" }

@@ -1,5 +1,9 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_assignments)]
+
 use nvcore::{
-    ecs::{component::*, ComponentId, Entity, Id},
+    ecs::{component::components::*, ComponentId, Entity, Id},
     mir::Mir,
 };
 pub struct ContextInternal {
@@ -19,7 +23,7 @@ impl ContextInternal {
         field_name: String,
         field_value: String,
     ) {
-        let field_comp = nvcore::ecs::component::StringField {
+        let field_comp = nvcore::ecs::component::components::StringFieldComponent {
             name: field_name,
             value: field_value,
         };
@@ -35,22 +39,24 @@ impl ContextInternal {
     pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::StringField {
         let field_comp = self
             .mir
-            .get_component_with_id::<StringField>(field_id.into())
+            .get_component_with_id::<StringFieldComponent>(field_id.into())
             .unwrap();
         //convert to raw pointer
         let field_comp_ptr = std::ptr::addr_of!(field_comp.component);
         //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const StringField, *mut ffi::StringField>(field_comp_ptr) }
+        unsafe { std::mem::transmute::<*const StringFieldComponent, *mut ffi::StringField>(field_comp_ptr) }
     }
-    pub fn get_name_component_with_id(&self, name_id: ffi::Id) -> *mut ffi::Name {
+    pub fn get_name_component_with_id(&self, name_id: ffi::Id) -> *mut ffi::NameComponent {
         let name_comp = self
             .mir
-            .get_component_with_id::<Name>(name_id.into())
+            .get_component_with_id::<NameComponent>(name_id.into())
             .unwrap();
         //convert to raw pointer
         let name_comp_ptr = std::ptr::addr_of!(name_comp.component);
         //#We know that the memory layout ought to be the same as the C++ struct
-        unsafe { std::mem::transmute::<*const Name, *mut ffi::Name>(name_comp_ptr) }
+        unsafe {
+            std::mem::transmute::<*const NameComponent, *mut ffi::NameComponent>(name_comp_ptr)
+        }
     }
     //Video component
     pub fn get_binary_component_with_id(&self, video_id: ffi::Id) -> *mut ffi::BinaryData {
@@ -117,7 +123,7 @@ mod ffi {
     }
 
     #[namespace = "components"]
-    pub struct StringField {
+    pub struct StringFieldComponent {
         pub name: String,
         pub value: String,
     }
@@ -130,7 +136,7 @@ mod ffi {
         video_data: String,
     }
 
-    pub struct Name {
+    pub struct NameComponent {
         pub name: String,
         pub aliases: Vec<String>,
     }
@@ -141,7 +147,7 @@ mod ffi {
         pub family_name: String,
     }
     #[namespace = "components"]
-    pub struct CharacterName {
+    pub struct CharacterNameComponent {
         pub name: CharacterNameFormat,
         pub aliases: Vec<String>,
     }

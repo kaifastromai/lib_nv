@@ -5,10 +5,6 @@
 #![feature(min_specialization)]
 pub mod exports;
 pub mod components {
-    use linkme::distributed_slice;
-
-    #[distributed_slice]
-    pub static COMPONENTS: [&'static str] = [..];
     //pub fn get_unique_type_id<T>() -> u64 {}
 }
 
@@ -16,6 +12,8 @@ pub mod type_id {
     pub trait TypeIdTy {
         fn get_type_id() -> TypeId;
         fn get_type_id_ref(&self) -> TypeId;
+        fn get_name() -> &'static str;
+        fn get_name_ref(&self) -> &'static str;
     }
     ///A globally unique identifier for a type
     #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -49,6 +47,12 @@ pub mod type_id {
                 let id: u64 = std::mem::transmute(ti);
                 TypeId { id }
             }
+        }
+        default fn get_name() -> &'static str {
+            std::any::type_name::<T>()
+        }
+        default fn get_name_ref(&self) -> &'static str {
+            std::any::type_name::<T>()
         }
     }
 }

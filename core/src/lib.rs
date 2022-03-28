@@ -1,11 +1,13 @@
 #![feature(min_specialization)]
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
+#![feature(generic_arg_infer)]
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 mod action;
 pub mod binary_storage;
 pub mod ecs;
+pub mod map;
 pub mod mir;
 use common::{
     exports::anyhow::{anyhow, Result},

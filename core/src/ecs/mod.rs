@@ -6,6 +6,7 @@ use self::component::archetypes::ArchetypeTy;
 use super::*;
 use crate::ecs::component::*;
 use common::{exports::*, type_id::*, type_name_any, uuid};
+use component::components::*;
 pub use serde::{Deserialize, Serialize};
 
 use anyhow::{anyhow, Result};

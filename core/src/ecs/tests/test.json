@@ -1,4 +1,5 @@
 {
+    "archetype_name": "GeneralCharacter",
     "entity_graph": [
         {
             "field": {
@@ -7,9 +8,7 @@
             }
         },
         {
-            "name": {
-                
-            }
+            "name": {}
         }
     ]
 }
