@@ -1,6 +1,26 @@
 /*!  /[Nvfs] is the Novella Virtual File System. It is used to serialize and deserialize a .nv project.
  * It is designed to be able to store and retrieve data from a .nv file, and to stream data from disk to memory, as needed.
- * It based on a sqlite database.
+ * It is a 'pile-of-files' system, this is normally zipped into a single file .nv file. When the .nv file is opened, it is
+ * unzipped into a directory structure into a temporary directory. When work is done, the temporary directory is zipped back
+ * into a .nv file and saved to disk.
+ * The directory structure is as follows:
+ * [project_name]
+ * ├── project_meta_data
+ * ├── ecs
+ * │   ├── archetypes
+ * │   ├── components
+ * │   ├── entities
+ * │── assets
+ * │   ├── images
+ * │   ├── videos
+ * │   ├── audio
+ * │   ├── binary
+ * |--documents
+ * |   ├── progressions
+ * |   ├── manuscripts
+ * │
+ *
+ *     
 */
 
 #![feature(min_specialization)]
@@ -13,8 +33,7 @@ use common::{
     type_id::{TypeId, TypeIdTy},
 };
 
-use nvproc::TypeId;
-use rusqlite::{types::Type, Connection};
+use flate2::*;
 use std::any::Any;
 use std::collections::HashMap;
 use std::fs::*;
@@ -396,53 +415,13 @@ impl Default for Vfs {
     }
 }
 
-pub struct Nvfs {
-    pub connection: Connection,
-}
+pub struct Nvfs {}
 
-impl Nvfs {
-    //open with path to the .nv file
-    pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
-        let connection = Connection::open(path)?;
-        Ok(Self { connection })
-    }
-    pub fn create_table(&self, table_name: &str, columns: &[&str]) -> Result<()> {
-        let mut statement = self.connection.prepare(
-            format!(
-                "CREATE TABLE IF NOT EXISTS {} ({})",
-                table_name,
-                columns.join(",")
-            )
-            .as_str(),
-        )?;
-        statement.execute([])?;
-        Ok(())
-    }
-    pub fn insert_into_table(
-        &self,
-        table_name: &str,
-        columns: &[&str],
-        values: &[&str],
-    ) -> Result<()> {
-        let mut statement = self.connection.prepare(
-            format!(
-                "INSERT INTO {} ({}) VALUES ({})",
-                table_name,
-                columns.join(","),
-                values.join(",")
-            )
-            .as_str(),
-        )?;
-        statement.execute([])?;
-        Ok(())
-    }
-    pub fn req(&self, path: FsPath) {}
-}
+impl Nvfs {}
 
 #[cfg(test)]
 mod test_super {
     use super::*;
-    use rusqlite::params;
     use std::io::{Read, Write};
     #[derive(Serialize, Deserialize, Debug, Clone)]
     #[serde(crate = "common::exports::serde")]
@@ -451,64 +430,9 @@ mod test_super {
         pub name: String,
         pub description: String,
     }
-    // impl<T: 'static> BinarySerializeTy for T {
-    //     fn get_any(&self) -> &dyn Any {
-    //         self
-    //     }
-    // }
-
-    //implement BinarySerializeType for TestStruct
-    // impl BinarySerializeTy for TestStruct {
-    //     fn get_any(&self) -> &dyn Any {
-    //         self
-    //     }
-    // }
 
     #[test]
-    fn test_serialize() {
-        // let test_struct = TestStruct {
-        //     id: 1,
-        //     name: String::from("test"),
-        //     description: String::from("test"),
-        // };
-        // let conn = Connection::open("test.nv").unwrap();
-        // conn.execute(
-        //     r"
-        // CREATE TABLE IF NOT EXISTS test_table(
-        //     id INTEGER PRIMARY KEY,
-        //     name TEXT,
-        //     description TEXT
-        // );
-        // ",
-        //     [],
-        // )
-        // .unwrap();
-        // let mut stmt = conn
-        //     .prepare(
-        //         r"
-        // INSERT INTO test_table(id, name, description)
-        // VALUES(?, ?, ?);
-        // ",
-        //     )
-        //     .unwrap();
-        // stmt.execute(params![
-        //     test_struct.id,
-        //     test_struct.name,
-        //     test_struct.description
-        // ])
-        // .unwrap();
-        // //get the value back
-        // let mut stmt = conn
-        //     .prepare(
-        //         r"
-        // SELECT id, name, description FROM test_table;
-        // ",
-        //     )
-        //     .unwrap();
-        // let mut rows = stmt.query_map([], |row| row.get(0)).unwrap();
-        // let row: u32 = rows.next().unwrap().unwrap();
-        // assert_eq!(test_struct.id, row);
-    }
+    fn test_serialize() {}
     #[test]
     fn test_dir_create() {
         let mut vfs = Vfs::new();
