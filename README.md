@@ -1,3 +1,7 @@
+![Linux Build](https://github.com/kaifastromai/lib_nv/workflows/rust_linux.yml/badge.svg)
+![Mac Build](https://github.com/kaifastromai/lib_nv/workflows/rust_mac.yml/badge.svg)
+![Windows Build](https://github.com/kaifastromai/lib_nv/workflows/rust_windows.yml/badge.svg)
+
 # Novella
 This is the core novella library. It is written almost entirely in rust.
 
