@@ -4,6 +4,8 @@
 */
 
 #![feature(min_specialization)]
+mod data_daemon;
+
 use common::{
     exports::{
         anyhow::{anyhow, Result},
