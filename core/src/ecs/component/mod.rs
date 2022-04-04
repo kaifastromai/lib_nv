@@ -137,4 +137,14 @@ pub mod components {
     pub struct RelationshipComponent {
         pub relationship: relationship::Relationship,
     }
+
+    ///An [Arc] component is a series of events related to a single entity and
+    /// traces their development over the course of the narrative.
+    #[component]
+    pub struct ArcComponent {
+        pub arc_name: String,
+        pub arc_description: String,
+        pub arc_events: Vec<crate::Event>,
+    }
+
 }

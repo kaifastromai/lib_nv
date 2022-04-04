@@ -9,6 +9,7 @@ pub mod binary_storage;
 pub mod ecs;
 pub mod map;
 pub mod mir;
+use common::exports::serde::*;
 use common::{
     exports::anyhow::{anyhow, Result},
     text::TextChunk,
@@ -224,13 +225,32 @@ impl Project {
     }
 }
 
+///An [Event] represents a mostly singular point in the narrative with a well defined time and place.
+#[nvproc::serde_derive]
+pub struct Event {
+    id: Id,
+    pub name: String,
+    pub location: String,
+    pub description: String,
+    involved_entities: Vec<Id>,
+}
 pub struct Timeline {}
-pub struct Arc {}
+
+///An [WorldArc] is a series of events that involve many [Entity]s.
+pub struct WorldArc {
+    id: Id,
+    pub name: String,
+    pub description: String,
+    pub events: Vec<Event>,
+}
 pub struct Scene {
     pub id: Id,
     pub name: String,
     pub description: String,
 }
+
+///A simple generic system for tracking time
+pub mod khronos;
 
 #[cfg(test)]
 mod test;
