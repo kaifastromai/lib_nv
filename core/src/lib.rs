@@ -175,7 +175,7 @@ pub struct Project {
     pub description: String,
     pub manuscripts: HashMap<Id, Manuscript>,
     pub scenes: HashMap<Id, Scene>,
-    pub arcs: HashMap<Id, Arc>,
+    pub arcs: HashMap<Id, WorldArc>,
     pub timelines: HashMap<Id, Timeline>,
     pub notes: HashMap<Id, Note>,
 }
