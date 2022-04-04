@@ -186,9 +186,6 @@ impl System {
     pub fn add_cycle(&mut self, cycle: Cycle) {
         self.cycles.push(cycle);
     }
-    pub fn add_epoch(&mut self, epoch: Epoch) {
-        self.epochs.push(epoch);
-    }
     pub fn get_cycle(&self, cycle_id: CycleId) -> Option<&Cycle> {
         self.cycles.iter().find(|c| c.id == cycle_id)
     }
