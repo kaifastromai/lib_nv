@@ -29,6 +29,7 @@ pub struct ArchetypeGraph {
     pub name: String,
 }
 
+#[nvproc::bincode_derive]
 #[nvproc::serde_derive]
 pub struct ArchetypeDescriptor {
     name: String,

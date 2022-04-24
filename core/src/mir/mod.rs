@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::action::request::Reqman;
 use crate::action::Actman;
+use crate::ecs::ComponentTyReqs;
 use crate::ecs::component::archetypes;
 use crate::ecs::ComponentId;
 use crate::ecs::ComponentTy;
@@ -34,10 +35,18 @@ impl Mir {
     pub fn add_entity(&mut self) -> Id {
         self.data.em.add_entity()
     }
-    pub fn add_component<T: ComponentTy>(&mut self, entity: Id, component: T) {
+    pub fn add_component<T: ComponentTy + common::exports::serde::Serialize + Clone>(
+        &mut self,
+        entity: Id,
+        component: T,
+    ) {
         self.data.em.add_component(entity, component);
     }
-    pub fn add_archetype<T: crate::ecs::component::archetypes::ArchetypeTy>(&mut self, entity: Id, archetype: T) {
+    pub fn add_archetype<T: crate::ecs::component::archetypes::ArchetypeTy>(
+        &mut self,
+        entity: Id,
+        archetype: T,
+    ) {
         todo!()
     }
 
@@ -54,8 +63,8 @@ impl Mir {
     pub fn get_all_living_entities(&self) -> Vec<Id> {
         self.data.em.get_all_living_entities()
     }
-    pub fn get_entity_component_by_id<T: ComponentTy>(
-        &'static self,
+    pub fn get_entity_component_by_id<T: ComponentTyReqs>(
+        &self,
         entity: Id,
         component_id: ComponentId,
     ) -> Result<&crate::ecs::Component<T>> {
@@ -63,7 +72,7 @@ impl Mir {
             .em
             .get_entity_component_by_id(entity, component_id)
     }
-    pub fn get_component_with_id<T: ComponentTy>(
+    pub fn get_component_with_id<T: ComponentTyReqs>(
         &self,
         component_id: ComponentId,
     ) -> Result<&crate::ecs::Component<T>> {

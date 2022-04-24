@@ -1,6 +1,7 @@
 #![feature(min_specialization)]
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
 #![feature(generic_arg_infer)]
+#![feature(trait_upcasting)]
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ use common::{
 };
 use ecs::{Entman, Id};
 
-///A note represents a note that can be created by the user.
+///A [Note] represents a note that can be created by the user.
 
 pub struct Note {
     id: Id,

@@ -8,6 +8,7 @@ use syn::{
     parse_macro_input, DeriveInput, Field,
 };
 const SERDE_EXPORT_PATH: &str = "common::exports::serde";
+const BINCODE_EXPORT_PATH: &str = "common::exports::bincode";
 use components_track::comp_link::COMPONENTS;
 
 trait StringExt {
@@ -232,15 +233,57 @@ pub fn generate_component_types(_attr: TokenStream, item: TokenStream) -> TokenS
             }
         }
     }
+    let comp_type_strings = comp_type_idents
+        .iter()
+        .map(|ident| ident.to_string())
+        .collect::<Vec<String>>();
     let comp_types_enum = quote! {
         use crate::ecs::component::components::*;
         //This is simply an enum that lists all the component types
-        #[derive(Debug,Clone)]
-        #[nvproc::serde_derive]
+        #[derive(Debug,PartialEq,Eq, PartialOrd,Ord)]
+        #[nvproc::bincode_derive]
         pub enum EComponentTypes{
             #(#comp_type_idents,)*
         }
+        impl EComponentTypes{
+            pub fn from_name(name:&str)->Option<Self>{
+                match name{
+                    #(#comp_type_strings=>Some(EComponentTypes::#comp_type_idents),)*
+                    _=>None
+                }
+            }
+        }
+        use common::exports::bincode::*;
+        use crate::ecs::CommonComponentStoreTy;
+        pub struct ComponentStoreSerializer{}
+
+        impl ComponentStoreSerializer{
+            pub fn serialize(name:&str, store:&Box<dyn crate::ecs::CommonComponentStoreTy>,encoder: &mut  impl bincode::enc::Encoder)->Result<(),bincode::error::EncodeError>{
+                match name {
+                    #(#comp_type_strings=>{
+                        let mut _s=store.into_store::<#comp_type_idents>();
+                        //write the name of the component
+                        _s.encode(encoder)
+                    },)*
+                    _=>{
+                        panic!("Could not find component type {}",name);
+                    }
+                }
+            }
+            pub fn deserialize(name:&str,decoder: &mut  impl bincode::de::Decoder)->Result<Box<dyn crate::ecs::CommonComponentStoreTy>,bincode::error::DecodeError>{
+                match name {
+                    #(#comp_type_strings=>{
+                      let ccs= crate::ecs::CommonComponentStore::<#comp_type_idents>::decode(decoder)?;
+                      Ok(ccs.get_any_owned())
+                    },)*
+                    _=>{
+                        panic!("Could not find component type {}",name);
+                    }
+                }
+            }
+        }
         //This is an enum that lists and owns all the component types
+        #[nvproc::bincode_derive]
         #[nvproc::serde_derive]
 
         pub enum EComponentGraphTypes{
@@ -356,6 +399,10 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
           fn get_any_mut(&mut self)->&mut dyn std::any::Any{
              self
           }
+          //returns the type of the component as a variant of EComponentTypes
+            fn get_component_type(&self)->crate::ecs::EComponentTypes{
+                 crate::ecs::EComponentTypes::#name
+            }
         }
 
 
@@ -377,6 +424,7 @@ pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
             .parse2(quote! {
                 #[derive(Component, Default,nvproc::TypeId)]
                 #[repr(C)]
+                #[nvproc::bincode_derive]
                 #[nvproc::serde_derive]
 
             })
@@ -621,11 +669,44 @@ pub fn gen_components(attr: TokenStream, item: TokenStream) -> TokenStream {
 //Adds serde's Serialize and Deserialize derive macros to the given struct,
 //and optionally accept an additional parameter to specify the crate name
 #[proc_macro_attribute]
+pub fn bincode_derive(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut input = syn::parse_macro_input!(item as syn::Item);
+    let derive_attr = quote! {
+        #[derive( bincode::Encode,bincode::Decode,Clone)]
+        #[bincode(crate=#BINCODE_EXPORT_PATH)]
+    };
+
+    match input {
+        syn::Item::Struct(ref mut s) => {
+            s.attrs.append(
+                &mut syn::Attribute::parse_outer
+                    .parse2(quote! {
+                       #derive_attr
+                    })
+                    .unwrap(),
+            );
+        }
+        syn::Item::Enum(ref mut e) => {
+            e.attrs.append(
+                &mut syn::Attribute::parse_outer
+                    .parse2(quote! {
+                       #derive_attr
+                    })
+                    .unwrap(),
+            );
+        }
+        _ => {}
+    }
+
+    input.into_token_stream().into()
+}
+
+#[proc_macro_attribute]
 pub fn serde_derive(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = syn::parse_macro_input!(item as syn::Item);
     let derive_attr = quote! {
-        #[derive(Serialize,Deserialize)]
-        #[serde(crate = #SERDE_EXPORT_PATH)]
+        #[derive( Serialize,Deserialize)]
+        #[serde(crate=#SERDE_EXPORT_PATH)]
     };
 
     match input {

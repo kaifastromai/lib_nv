@@ -9,8 +9,10 @@ test = true
 [dependencies]
 petgraph = "0.6.0"
 serde = { version = "*", features = ["serde_derive"] }
+erased-serde = { version = "*" }
 serde_json = "*"
-uuid = { version = "0.8.2", features = ["serde", "v4", "v1"] }
+bincode = { version = "2.0.0-rc.1", features = ["serde"] }
+uuid = { version = "1.0.0", features = ["serde", "v4", "v1"] }
 anyhow = "*"
 linkme = "*"
 nvproc = { version = "*", path = "../procmacros" }

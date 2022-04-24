@@ -3,6 +3,7 @@ pub mod relationship;
 
 use common::components::*;
 use common::exports::serde::*;
+use common::exports::*;
 use common::type_id::*;
 use components_track::comp_link::COMPONENTS;
 use linkme::distributed_slice;
@@ -17,11 +18,13 @@ pub mod components {
     use super::*;
     ///A general location component that will give basic tracking capabilities to the engine
     ///
+    #[nvproc::bincode_derive]
     #[nvproc::serde_derive]
     pub struct GenericLocation {
         pub name: String,
         pub description: String,
     }
+    #[nvproc::bincode_derive]
     #[nvproc::serde_derive]
     pub enum ELocation {
         Generic(GenericLocation),
@@ -89,6 +92,7 @@ pub mod components {
         image_data: PathBuf,
     }
 
+    #[nvproc::bincode_derive]
     #[nvproc::serde_derive]
     pub enum EGender {
         Male,
@@ -117,6 +121,7 @@ pub mod components {
         pub aliases: Vec<String>,
     }
     #[derive(Default)]
+    #[nvproc::bincode_derive]
     #[nvproc::serde_derive]
     pub struct CharacterNameFormat {
         pub given_name: String,

@@ -5,7 +5,11 @@ use self::component::archetypes::{Archetype, ArchetypeTy};
 
 use super::*;
 use crate::ecs::component::*;
-use common::{exports::*, type_id::*, type_name_any, uuid};
+use common::{
+    exports::{serde::ser::SerializeMap, *},
+    type_id::*,
+    type_name_any, uuid,
+};
 use component::components::*;
 pub use serde::{Deserialize, Serialize};
 
@@ -21,8 +25,8 @@ pub struct ComponentTypeId(TypeId);
 impl ComponentTypeIdTy for ComponentTypeId {}
 
 pub type Id = u128;
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[nvproc::serde_derive("common::exports::serde")]
+#[nvproc::bincode_derive]
+#[derive(Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ComponentId {
     id: u128,
 }
@@ -65,9 +69,13 @@ pub trait ComponentTy: 'static {
     fn clean(&mut self);
     fn get_any(&self) -> &dyn Any;
     fn get_any_mut(&mut self) -> &mut dyn Any;
+    fn get_component_type(&self) -> EComponentTypes;
+    fn serialize(&self) -> Result<Vec<u8>> {
+        todo!()
+    }
 }
 
-pub trait ComponentReqsTy: 'static {
+pub trait ComponentTyReqs: 'static + Clone + ComponentTy {
     fn get_type_id() -> TypeId {
         TypeId::of::<Self>()
     }
@@ -75,7 +83,7 @@ pub trait ComponentReqsTy: 'static {
         std::any::type_name::<Self>()
     }
 }
-impl<T> ComponentReqsTy for T where T: ComponentTy + Default {}
+impl<T: ComponentTy + Clone> ComponentTyReqs for T {}
 impl ComponentTy for () {
     fn get_type_id(&self) -> TypeId {
         TypeId::of::<()>()
@@ -94,9 +102,13 @@ impl ComponentTy for () {
     }
 
     fn clean(&mut self) {}
+    fn get_component_type(&self) -> EComponentTypes {
+        unimplemented!()
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
+#[nvproc::bincode_derive]
 #[nvproc::serde_derive]
 pub struct Signature(Vec<TypeId>);
 impl Signature {
@@ -132,7 +144,8 @@ impl From<Vec<TypeId>> for Signature {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+#[nvproc::bincode_derive]
 pub struct Entity {
     id: Id,
     is_alive: bool,
@@ -159,18 +172,18 @@ impl Entity {
     pub fn get_id(&self) -> Id {
         self.id
     }
-    pub fn add_component<T: ComponentTy>(&mut self) -> Result<()> {
+    pub fn add_component<T: ComponentTyReqs>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
         self.components.add(tid);
 
         Ok(())
     }
-    pub fn remove_component<T: ComponentTy>(&mut self) -> Result<()> {
+    pub fn remove_component<T: ComponentTyReqs>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
         self.components.remove_component(tid)?;
         Ok(())
     }
-    pub fn has_component<T: ComponentTy>(&self) -> bool {
+    pub fn has_component<T: ComponentTyReqs>(&self) -> bool {
         let tid = TypeId::of::<T>();
         self.components.contains(tid)
     }
@@ -188,7 +201,7 @@ pub struct EntityRef<'a> {
     entman: &'a Entman,
 }
 impl<'a> EntityRef<'a> {
-    pub fn has_component<T: ComponentTy>(&self) -> bool {
+    pub fn has_component<T: ComponentTyReqs>(&self) -> bool {
         self.entman.get_entity(self.id).has_component::<T>()
     }
 }
@@ -197,33 +210,47 @@ pub struct EntityRefMut<'a> {
     entman: &'a mut Entman,
 }
 
-pub trait CommonComponentStoreTy: 'static {
+pub trait CommonComponentStoreTy: Any {
     fn get_type_id(&self) -> TypeId;
-    fn get_any(&self) -> &dyn Any;
+    fn get_common_type_name(&self) -> &str;
+    fn get_any(&self) -> &dyn CommonComponentStoreTy;
+    fn get_any_owned(&self) -> Box<dyn CommonComponentStoreTy>;
     fn get_any_mut(&mut self) -> &mut dyn Any;
     fn insert_dyn(&mut self, id: Id, component: Box<dyn ComponentTy>) -> Result<()>;
 }
+
 impl dyn CommonComponentStoreTy {
     fn get_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-    fn into_store<T: ComponentTy>(&self) -> &CommonComponentStore<T> {
-        self.get_any()
-            .downcast_ref::<CommonComponentStore<T>>()
-            .unwrap()
+    fn into_store<T: ComponentTyReqs>(&self) -> &CommonComponentStore<T> {
+        //convert to Any
+        //convert to CommonComponentStore
+        let any: &CommonComponentStore<T> = self
+            .downcast_ref()
+            .expect("Could not downcast to CommonComponentStore");
+        any
     }
-    fn into_store_mut<T: ComponentTy>(&mut self) -> &mut CommonComponentStore<T> {
+    fn into_store_mut<T: ComponentTyReqs>(&mut self) -> &mut CommonComponentStore<T> {
         self.get_any_mut()
             .downcast_mut::<CommonComponentStore<T>>()
             .unwrap()
     }
+    fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        let any: &dyn Any = self;
+        any.downcast_ref::<T>()
+    }
 }
-impl<T: ComponentTy> CommonComponentStoreTy for CommonComponentStore<T> {
+impl<T: ComponentTyReqs> CommonComponentStoreTy for CommonComponentStore<T> {
     fn get_type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
-    fn get_any(&self) -> &dyn Any {
+    fn get_any(&self) -> &dyn CommonComponentStoreTy {
         self
+    }
+    fn get_any_owned(&self) -> Box<dyn CommonComponentStoreTy> {
+        let clone = (*self).clone();
+        Box::new(clone)
     }
     fn get_any_mut(&mut self) -> &mut dyn Any {
         self
@@ -231,15 +258,21 @@ impl<T: ComponentTy> CommonComponentStoreTy for CommonComponentStore<T> {
     fn insert_dyn(&mut self, id: Id, component: Box<dyn ComponentTy>) -> Result<()> {
         todo!()
     }
+
+    fn get_common_type_name(&self) -> &str {
+        self.get_common_type_name_internal()
+    }
 }
+
 //----------------------------------------------------------------------------------------------------------------------//
 
-pub struct Component<T: ComponentTy> {
+#[nvproc::bincode_derive]
+pub struct Component<T: ComponentTyReqs> {
     id: ComponentId,
     pub owning_entity: Option<Id>,
     pub component: T,
 }
-impl<T: ComponentTy + Default> Component<T> {
+impl<T: ComponentTyReqs + Default> Component<T> {
     fn new(entity: Id) -> Self {
         Self {
             id: uuid::gen_128().into(),
@@ -248,7 +281,7 @@ impl<T: ComponentTy + Default> Component<T> {
         }
     }
 }
-impl<T: ComponentTy> Component<T> {
+impl<T: ComponentTyReqs> Component<T> {
     pub fn from(entity: Id, component: T) -> Self {
         Self {
             id: uuid::gen_128().into(),
@@ -298,7 +331,7 @@ impl<T: ComponentTy> Component<T> {
         self.component
     }
 }
-impl<T: ComponentTy> ComponentTy for Component<T> {
+impl<T: ComponentTyReqs + common::exports::serde::Serialize> ComponentTy for Component<T> {
     fn get_component_name(&self) -> &'static str {
         self.get_inner().get_component_name()
     }
@@ -312,40 +345,46 @@ impl<T: ComponentTy> ComponentTy for Component<T> {
     fn clean(&mut self) {
         self.get_inner_mut().clean();
     }
+    fn get_component_type(&self) -> EComponentTypes {
+        self.get_inner().get_component_type()
+    }
 }
 
 //implement Eq and Hash for Component<T>
-impl<T: ComponentTy> Eq for Component<T> {}
+impl<T: ComponentTyReqs> Eq for Component<T> {}
 //implement partial_eq for Component<T>
-impl<T: ComponentTy> PartialEq for Component<T> {
+impl<T: ComponentTyReqs> PartialEq for Component<T> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
-impl<T: ComponentTy> std::hash::Hash for Component<T> {
+impl<T: ComponentTyReqs> std::hash::Hash for Component<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 //implement PartialOrd and Ord for Component
-impl<T: ComponentTy> PartialOrd for Component<T> {
+impl<T: ComponentTyReqs> PartialOrd for Component<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.id.cmp(&other.id))
     }
 }
-impl<T: ComponentTy> Ord for Component<T> {
+impl<T: ComponentTyReqs> Ord for Component<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.id.cmp(&other.id)
     }
 }
 
+#[derive(bincode::Encode, bincode::Decode, serde::Serialize, serde::Deserialize)]
+#[serde(crate = "common::exports::serde")]
+#[bincode(crate = "common::exports::bincode")]
 pub struct ComponentInfo {
     pub id: Id,
     pub owning_entity: Option<Id>,
 }
 
 //impl deref
-impl<'a, T: ComponentTy> std::ops::Deref for Component<T> {
+impl<'a, T: ComponentTyReqs> std::ops::Deref for Component<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.component
@@ -354,19 +393,22 @@ impl<'a, T: ComponentTy> std::ops::Deref for Component<T> {
 
 //Stores all compoments of a common type.
 type EntityId = u128;
-#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
+#[nvproc::bincode_derive]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub struct OrphanComponent {
     id: ComponentId,
     previous_owner: Id,
 }
-pub struct CommonComponentStore<T: ComponentTy> {
+#[nvproc::bincode_derive]
+pub struct CommonComponentStore<T: ComponentTyReqs> {
     //the typs of component this store contains
     type_id: TypeId,
+    type_name: String,
     //the components of this store, hashed by the owning entity id
     components: HashMap<EntityId, HashMap<ComponentId, Component<T>>>,
     orphans: Vec<OrphanComponent>,
 }
-impl<T: ComponentTy + Default> CommonComponentStore<T> {
+impl<T: ComponentTyReqs + Default> CommonComponentStore<T> {
     pub fn insert_default(&mut self, owning_entity: Id) -> Result<ComponentId> {
         //first check if there is an orphan component
         let orphan_component = self.orphans.pop();
@@ -395,10 +437,11 @@ impl<T: ComponentTy + Default> CommonComponentStore<T> {
         Ok(component_id)
     }
 }
-impl<T: ComponentTy> CommonComponentStore<T> {
+impl<T: ComponentTyReqs> CommonComponentStore<T> {
     pub fn new() -> Self {
         Self {
             type_id: TypeId::of::<T>(),
+            type_name: T::get_name().to_string(),
             components: HashMap::new(),
             orphans: Vec::new(),
         }
@@ -431,6 +474,16 @@ impl<T: ComponentTy> CommonComponentStore<T> {
             }
         }
         Ok(id)
+    }
+    //Returns the type of this common storage
+    pub fn get_common_type(&self) -> Result<EComponentTypes> {
+        let res = EComponentTypes::from_name(self.type_id.get_name_ref())
+            .ok_or(anyhow! {"Could not find type for {}",self.type_id.get_name_ref()})?;
+        Ok(res)
+    }
+    //Returns the name of the common type as a String
+    fn get_common_type_name_internal(&self) -> &str {
+        self.type_name.as_str()
     }
     pub fn insert_dyn(
         &mut self,
@@ -517,11 +570,41 @@ impl<T: ComponentTy> CommonComponentStore<T> {
         Ok(())
     }
 }
+impl<'de> serde::Deserialize<'de> for Box<dyn CommonComponentStoreTy> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
+    }
+}
+
+impl bincode::Encode for Box<dyn CommonComponentStoreTy> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        let name = self.get_common_type_name();
+        //write the name
+        name.encode(encoder)?;
+        ComponentStoreSerializer::serialize(name, self, encoder)
+    }
+}
+impl bincode::Decode for Box<dyn CommonComponentStoreTy> {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let name = String::decode(decoder)?;
+        let res = ComponentStoreSerializer::deserialize(name.as_str(), decoder)?;
+        Ok(res)
+    }
+}
 
 //the binary storage component stores and manages the access of binary data (like audio/video)
 //the components that need access
 //Stores all the component data in hashmaps indexed by the owning entity id
-
+#[derive(bincode::Encode, bincode::Decode)]
+#[bincode(crate = "common::exports::bincode")]
 pub struct Storage {
     //The bins of components. Points to a vector of components, hashed by type id
     bins: HashMap<TypeId, Box<dyn CommonComponentStoreTy>>,
@@ -534,7 +617,10 @@ impl Storage {
             component_infos: HashMap::new(),
         }
     }
-    pub fn insert_default<T: ComponentTy + Default>(&mut self, entity: Id) -> Result<ComponentId> {
+    pub fn insert_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
+        &mut self,
+        entity: Id,
+    ) -> Result<ComponentId> {
         let id = TypeId::of::<T>();
         let component_id;
         match self.bins.contains_key(&id) {
@@ -560,7 +646,7 @@ impl Storage {
     pub fn insert_component_dyn(entity: Id, component: impl ComponentTy) -> Result<()> {
         todo!()
     }
-    pub fn insert_component<T: ComponentTy>(
+    pub fn insert_component<T: ComponentTyReqs + serde::Serialize + Clone>(
         &mut self,
         entity: Id,
         component: T,
@@ -585,7 +671,7 @@ impl Storage {
 
         component_id
     }
-    pub fn get_entity_component_by_id<T: ComponentTy>(
+    pub fn get_entity_component_by_id<T: ComponentTyReqs + Clone>(
         &self,
         entity: Id,
         component_id: ComponentId,
@@ -615,7 +701,7 @@ impl Storage {
             )),
         }
     }
-    pub fn get_component_with_id<T: ComponentTy>(
+    pub fn get_component_with_id<T: ComponentTyReqs + Clone>(
         &self,
         component_id: ComponentId,
     ) -> Result<&Component<T>> {
@@ -640,7 +726,7 @@ impl Storage {
         }
     }
     //Returns a list of all components of type T for the given entity
-    pub fn get_components_of_type<T: ComponentTy>(
+    pub fn get_components_of_type<T: ComponentTyReqs>(
         &self,
         entity: EntityId,
     ) -> Result<Vec<&Component<T>>> {
@@ -665,7 +751,7 @@ impl Storage {
         }
     }
 
-    pub fn get_component_mut_by_id<T: ComponentTy>(
+    pub fn get_component_mut_by_id<T: ComponentTyReqs>(
         &mut self,
         entity: Id,
         component_id: ComponentId,
@@ -693,7 +779,7 @@ impl Storage {
         }
     }
     //Give an orphan component a new entity parent.
-    pub fn reparent<T: ComponentTy + ComponentReqsTy>(&mut self, new_parent: Id) -> Result<()> {
+    pub fn reparent<T: ComponentTyReqs>(&mut self, new_parent: Id) -> Result<()> {
         //first collect all orphaned components
         let id = TypeId::of::<T>();
         let store = self
@@ -747,6 +833,8 @@ impl Display for TypeIdInternal {
     }
 }
 
+#[derive(bincode::Encode, bincode::Decode)]
+#[bincode(crate = "common::exports::bincode")]
 pub struct Entman {
     entities: HashMap<Id, Entity>,
     storage: Storage,
@@ -781,7 +869,7 @@ impl Entman {
 
     pub fn remove_entity(&mut self, entity: Id) {}
     //Adds a component to an entity
-    pub fn add_component<T: ComponentTy>(
+    pub fn add_component<T: ComponentTyReqs + serde::Serialize + Clone>(
         &mut self,
         entity: Id,
         component: T,
@@ -793,7 +881,10 @@ impl Entman {
         component_id
     }
     //Adds a component to an entity, calling the default "constructor"
-    pub fn add_default<T: ComponentTy + Default>(&mut self, entity: Id) -> Result<ComponentId> {
+    pub fn add_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
+        &mut self,
+        entity: Id,
+    ) -> Result<ComponentId> {
         let ent = self.entities.get_mut(&entity).unwrap();
         ent.add_component::<T>()?;
         self.storage.insert_default::<T>(entity)
@@ -831,7 +922,7 @@ impl Entman {
             .collect()
     }
     //Returns the component of type T and id ComponentId for the given entity.
-    pub fn get_entity_component_by_id<T: ComponentTy>(
+    pub fn get_entity_component_by_id<T: ComponentTyReqs>(
         &self,
         entity: Id,
         component_id: ComponentId,
@@ -840,11 +931,17 @@ impl Entman {
             .get_entity_component_by_id(entity, component_id)
     }
     //Returns the component of type T and id ComponentId.
-    pub fn get_component_with_id<T: ComponentTy>(&self, id: ComponentId) -> Result<&Component<T>> {
+    pub fn get_component_with_id<T: ComponentTyReqs>(
+        &self,
+        id: ComponentId,
+    ) -> Result<&Component<T>> {
         self.storage.get_component_with_id(id)
     }
     //Get's all components of a common type beling to an entity.
-    pub fn get_components_of_type<T: ComponentTy>(&self, entity: Id) -> Result<Vec<&Component<T>>> {
+    pub fn get_components_of_type<T: ComponentTyReqs>(
+        &self,
+        entity: Id,
+    ) -> Result<Vec<&Component<T>>> {
         self.storage.get_components_of_type::<T>(entity)
     }
 }

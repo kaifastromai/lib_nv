@@ -2,8 +2,8 @@ use super::super::*;
 use nvproc::Component;
 use petgraph::graph::*;
 use petgraph::visit::*;
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
 pub enum ERelationship {
     MajorMinor(Major, Minor),
     Symmetric(Symmetric),
@@ -18,28 +18,28 @@ impl Default for ERelationship {
         ERelationship::Symmetric(Symmetric::default())
     }
 }
-
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
-
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
 pub enum Major {
     Parent(Parent),
     Custom(Custom),
 }
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+
 pub struct Custom {
     pub name: String,
     pub description: String,
 }
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
 pub enum Minor {
     Child(Child),
     Custom(Custom),
 }
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+
 pub enum Symmetric {
     Friend,
     Enemy,
@@ -53,32 +53,37 @@ impl Default for Symmetric {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+
 pub enum Parent {
     Mother,
     Father,
 }
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+
 pub enum Child {
     Daughter,
     Son,
 }
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+
 pub enum Sibling {
     Sister,
     Brother,
 }
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+
 pub enum Spouse {
     Husband,
     Wife,
 }
-#[derive(Serialize, Deserialize, Default)]
-#[serde(crate = "common::exports::serde")]
+#[nvproc::bincode_derive]
+#[nvproc::serde_derive]
+#[derive(Default)]
 
 pub struct Relationship {
     pub relationship_name: String,
