@@ -296,6 +296,7 @@ pub struct Timeline {}
 pub struct Arc {}
 #[nvproc::bincode_derive]
 
+///A scene is a collection of [Entity]s and [Event]s.
 pub struct Scene {
     pub id: Id,
     pub name: String,
