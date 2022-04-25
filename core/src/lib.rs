@@ -10,6 +10,7 @@ pub mod binary_storage;
 pub mod ecs;
 pub mod map;
 pub mod mir;
+use common::exports::*;
 use common::{
     exports::anyhow::{anyhow, Result},
     text::TextChunk,
@@ -19,6 +20,7 @@ use ecs::{Entman, Id};
 
 ///A [Note] represents a note that can be created by the user.
 
+#[nvproc::bincode_derive]
 pub struct Note {
     id: Id,
     pub name: String,
@@ -27,6 +29,8 @@ pub struct Note {
     pub involved_entities: Vec<Id>,
     time_meta: TimeMetaData,
 }
+#[nvproc::bincode_derive]
+
 pub struct Progression {
     id: Id,
     name: String,
@@ -37,9 +41,9 @@ pub struct Progression {
 }
 //impl Progression
 impl Progression {
-    pub fn new(id: Id, name: String, description: String, text: String, ordering: u32) -> Self {
+    pub fn new(name: String, description: String, text: String, ordering: u32) -> Self {
         Progression {
-            id,
+            id: common::uuid::gen_128(),
             name,
             description,
             involved_entities: Vec::new(),
@@ -66,6 +70,8 @@ impl std::hash::Hash for Progression {
 
 //A manuscript contains a collection of progressions.
 
+#[nvproc::bincode_derive]
+
 pub struct Manuscript {
     id: Id,
     name: String,
@@ -73,9 +79,9 @@ pub struct Manuscript {
     progressions: HashMap<Id, Progression>,
 }
 impl Manuscript {
-    pub fn new(id: Id, name: String, description: String) -> Self {
+    pub fn new(name: String, description: String) -> Self {
         Manuscript {
-            id,
+            id: common::uuid::gen_128(),
             name,
             description,
             progressions: HashMap::new(),
@@ -130,6 +136,40 @@ impl std::hash::Hash for Manuscript {
     }
 }
 
+impl bincode::Encode for TimeMetaData {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        let date_string_creation = self.creation_date.timestamp();
+        let date_string_last_modified = self.last_modified_date.timestamp();
+        date_string_last_modified.encode(encoder)?;
+        date_string_creation.encode(encoder)?;
+        Ok(())
+    }
+}
+impl bincode::Decode for TimeMetaData {
+    fn decode<D: bincode::de::Decoder>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let date_string_creation = i64::decode(decoder)?;
+        let date_string_last_modified = i64::decode(decoder)?;
+        let creation_date = DateTime::<Utc>::from_utc(
+            chrono::NaiveDateTime::from_timestamp(date_string_creation, 0),
+            Utc,
+        );
+        let last_modified_date = DateTime::<Utc>::from_utc(
+            chrono::NaiveDateTime::from_timestamp(date_string_last_modified, 0),
+            Utc,
+        );
+        Ok(TimeMetaData {
+            creation_date,
+            last_modified_date,
+        })
+    }
+}
+
+#[derive(Clone)]
 pub struct TimeMetaData {
     creation_date: DateTime<Utc>,
     last_modified_date: DateTime<Utc>,
@@ -151,6 +191,8 @@ impl TimeMetaData {
         self.last_modified_date = date;
     }
 }
+#[nvproc::bincode_derive]
+
 pub struct ProjectMetaData {
     author: String,
     description: String,
@@ -169,6 +211,7 @@ impl ProjectMetaData {
         }
     }
 }
+#[nvproc::bincode_derive]
 pub struct Project {
     pub id: Id,
     pub project_meta_data: ProjectMetaData,
@@ -180,7 +223,7 @@ pub struct Project {
     pub notes: HashMap<Id, Note>,
 }
 impl Project {
-    pub fn new(name: &str, description: &str) -> Self {
+    pub fn new(description: &str) -> Self {
         Project {
             id: uuid::gen_128(),
             project_meta_data: ProjectMetaData::new(),
@@ -204,6 +247,9 @@ impl Project {
             notes: HashMap::new(),
         }
     }
+    pub fn set_meta_data(&mut self, meta_data: ProjectMetaData) {
+        self.project_meta_data = meta_data;
+    }
     pub fn add_manuscript(&mut self, manuscript: Manuscript) {
         self.manuscripts.insert(manuscript.id, manuscript);
     }
@@ -219,14 +265,16 @@ impl Project {
     pub fn get_all_manuscripts(&self) -> Vec<&Manuscript> {
         self.manuscripts.values().collect()
     }
-
-    pub fn deserialize(data: &str) -> Result<Self> {
-        todo!()
-    }
 }
 
+#[nvproc::bincode_derive]
+
 pub struct Timeline {}
+#[nvproc::bincode_derive]
+
 pub struct Arc {}
+#[nvproc::bincode_derive]
+
 pub struct Scene {
     pub id: Id,
     pub name: String,
