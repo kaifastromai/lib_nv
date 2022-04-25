@@ -6,10 +6,10 @@ use nvcore::{
     ecs::{component::components::*, ComponentId, Entity, Id},
     mir::Mir,
 };
-pub struct ContextInternal {
-    pub mir: Mir,
+pub struct ContextInternal<'a> {
+    pub mir: Mir<'a>,
 }
-impl ContextInternal {
+impl<'a> ContextInternal<'a> {
     pub fn create_project(&mut self, name: String, desc: String) {
         self.mir.create_project(name, desc);
     }
@@ -75,7 +75,7 @@ impl ContextInternal {
         todo!()
     }
 }
-pub fn new_ctx() -> *mut ContextInternal {
+pub fn new_ctx() -> *mut ContextInternal<'static> {
     Box::into_raw(Box::new(ContextInternal { mir: Mir::new() }))
 }
 //Safety
@@ -158,9 +158,9 @@ mod ffi {
 
     #[namespace = "nvr"]
     extern "Rust" {
-        type ContextInternal;
+        type ContextInternal<'a>;
 
-        pub fn new_ctx() -> *mut ContextInternal;
+        pub fn new_ctx() -> *mut ContextInternal<'static>;
         pub fn create_project(&mut self, name: String, desc: String);
         pub fn add_entity(&mut self) -> Id;
         pub fn add_field_component(&mut self, entity: Id, field_name: String, field_value: String);

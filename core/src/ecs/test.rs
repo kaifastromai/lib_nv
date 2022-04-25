@@ -88,33 +88,27 @@ fn test_add_archetype() {
     //compare signatures
     assert_eq!(
         character_archetype.describe().get_signature(),
-        entity.get_signature()
+        entity.unwrap().get_signature()
     );
 }
 #[test]
-fn test_entman_serde() {
-    // let mut em = Entman::new();
-    // let entity = em.add_entity();
-    // em.add_component(
-    //     entity,
-    //     StringFieldComponent {
-    //         name: "name".to_string(),
-    //         value: "value".to_string(),
-    //     },
-    // );
-    // em.add_default::<StringFieldComponent>(entity);
-    // //serialize entman
-    // let mut buf = Vec::new();
-    // bincode::serde::serialize_into(&mut buf, &em).unwrap();
-    // let mut em2: Entman = bincode::deserialize_from(&*buf).unwrap();
-    // //compare entman
-    // //compare entities
-    // //get all living entities
-    // let em_living = em.get_all_living_entities();
-    // let em2_living = em2.get_all_living_entities();
-    // for (e1, e2) in em_living.iter().zip(em2_living.iter()) {
-    //     assert_eq!(e1, e2);
-    // }
+fn test_dynamic() {
+    let mut em = Entman::new();
+    let entity = em.add_entity();
+    em.add_component(
+        entity,
+        StringFieldComponent {
+            name: "name".to_string(),
+            value: "value".to_string(),
+        },
+    );
+    em.add_default::<NameComponent>(entity);
+    em.add_default::<StringFieldComponent>(entity);
+    let owned_entity = em.get_entity_owned(entity).unwrap();
+
+    let entinfo = em.get_entity(entity).unwrap();
+    //assert signatures are the same
+    assert_eq!(entinfo.get_signature(), owned_entity.get_signature());
 }
 #[test]
 pub fn test_common_store_serde() {

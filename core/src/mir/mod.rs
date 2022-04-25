@@ -2,45 +2,41 @@ use std::collections::VecDeque;
 
 use crate::action::request::Reqman;
 use crate::action::Actman;
-use crate::ecs::ComponentTyReqs;
 use crate::ecs::component::archetypes;
 use crate::ecs::ComponentId;
 use crate::ecs::ComponentTy;
+use crate::ecs::ComponentTyReqs;
 use crate::ecs::Entity;
 use crate::ecs::Entman;
 use crate::ecs::Id;
 use crate::Project;
 use common::exports::anyhow::{anyhow, Result};
 
-pub struct MirData {
-    pub em: Entman,
+pub struct Mir<'a> {
     pub proj: Project,
+    pub em: Entman,
+    reqman: Reqman,
+    actman: Actman<'a>,
 }
-#[repr(C)]
-pub struct Mir {
-    pub data: MirData,
-}
-impl Mir {
+impl<'a> Mir<'a> {
     pub fn new() -> Self {
-        let data = MirData {
-            em: Entman::new(),
+        Mir {
             proj: Project::new_empty(),
-        };
-        let mut m = Mir { data };
-        // m.actman = Some(Actman::new(&mut m.data));
-        // m.reqman = Some(Reqman::new(&mut m.data));
-        m
+            em: Entman::new(),
+            reqman: Reqman::new(),
+            actman: Actman::new(),
+        }
     }
     //adds an entity
     pub fn add_entity(&mut self) -> Id {
-        self.data.em.add_entity()
+        self.em.add_entity()
     }
     pub fn add_component<T: ComponentTy + common::exports::serde::Serialize + Clone>(
         &mut self,
         entity: Id,
         component: T,
     ) {
-        self.data.em.add_component(entity, component);
+        self.em.add_component(entity, component);
     }
     pub fn add_archetype<T: crate::ecs::component::archetypes::ArchetypeTy>(
         &mut self,
@@ -51,31 +47,29 @@ impl Mir {
     }
 
     pub fn create_project(&mut self, name: String, desc: String) {
-        self.data.proj.project_meta_data.name = name;
-        self.data.proj.description = desc;
+        self.proj.project_meta_data.name = name;
+        self.proj.description = desc;
     }
     pub fn get_entity_count(&self) -> usize {
-        self.data.em.get_entity_count()
+        self.em.get_entity_count()
     }
     pub fn get_entity(&self, id: Id) -> Entity {
-        self.data.em.get_entity_clone(id)
+        self.em.get_entity_clone(id)
     }
     pub fn get_all_living_entities(&self) -> Vec<Id> {
-        self.data.em.get_all_living_entities()
+        self.em.get_all_living_entities()
     }
     pub fn get_entity_component_by_id<T: ComponentTyReqs>(
         &self,
         entity: Id,
         component_id: ComponentId,
     ) -> Result<&crate::ecs::Component<T>> {
-        self.data
-            .em
-            .get_entity_component_by_id(entity, component_id)
+        self.em.get_entity_component_by_id(entity, component_id)
     }
     pub fn get_component_with_id<T: ComponentTyReqs>(
         &self,
         component_id: ComponentId,
     ) -> Result<&crate::ecs::Component<T>> {
-        self.data.em.get_component_with_id(component_id)
+        self.em.get_component_with_id(component_id)
     }
 }
