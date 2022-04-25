@@ -1,6 +1,6 @@
 use std::any::{self, Any};
 
-use crate::mir::{Mir, MirData};
+use crate::mir::{Mir};
 
 use super::ParamTy;
 use common::exports::anyhow::{anyhow, Result};
@@ -17,26 +17,28 @@ impl<T: Any> ResponseTy for T {}
 
 pub struct Request<'a, R: ResponseTy, P: Clone> {
     pub param: P,
-    req_fn: &'a dyn Fn(&mut MirData, P) -> Result<R>,
+    req_fn: &'a dyn Fn(&mut Mir, P) -> Result<R>,
 }
 impl<'a, R: ResponseTy, P: Clone> Request<'a, R, P> {
-    pub fn new(req_fn: &'a dyn Fn(&mut MirData, P) -> Result<R>, param: P) -> Self {
+    pub fn new(req_fn: &'a dyn Fn(&mut Mir, P) -> Result<R>, param: P) -> Self {
         Request { param, req_fn }
     }
-    pub fn exec(&self, mir: &mut MirData) -> Result<R> {
+    pub fn exec(&self, mir: &mut Mir) -> Result<R> {
         (self.req_fn)(mir, self.param.clone())
     }
 }
 //Manages requests and responses for Mir.
-pub struct Reqman<'r> {
-    mir_ref: &'r mut MirData,
-}
-impl<'r> Reqman<'r> {
-    pub fn new(mir_ref: &'r mut MirData) -> Self {
-        Reqman { mir_ref }
+pub struct Reqman {}
+impl Reqman {
+    pub fn new() -> Self {
+        Reqman {}
     }
-    pub fn request<R: ResponseTy, P: Clone>(&mut self, req: Request<R, P>) -> Result<R> {
-        let res = req.exec(self.mir_ref)?;
+    pub fn request<R: ResponseTy, P: Clone>(
+        &mut self,
+        req: Request<R, P>,
+        mir: &mut Mir,
+    ) -> Result<R> {
+        let res = req.exec(mir)?;
         Ok(res)
     }
 }

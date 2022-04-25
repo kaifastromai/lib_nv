@@ -16,7 +16,18 @@ pub mod type_id {
         fn get_name_ref(&self) -> &'static str;
     }
     ///A globally unique identifier for a type
-    #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    #[derive(
+        serde::Serialize,
+        serde::Deserialize,
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        bincode::Encode,
+        bincode::Decode,
+    )]
     pub struct TypeId {
         pub id: u64,
     }
