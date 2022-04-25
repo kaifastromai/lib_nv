@@ -71,26 +71,6 @@ pub mod components {
         pub name: String,
         pub value: f32,
     }
-    #[component]
-    pub struct VideoComponent {
-        video_name: String,
-        description: String,
-        video_type: String,
-        video_data: PathBuf,
-    }
-    #[component]
-    pub struct AudioComponent {
-        name: String,
-        description: String,
-        r#type: String,
-        audio_data: PathBuf,
-    }
-    #[component]
-    pub struct ImageComponent {
-        name: String,
-        description: String,
-        image_data: PathBuf,
-    }
 
     #[nvproc::bincode_derive]
     #[nvproc::serde_derive]
@@ -134,8 +114,26 @@ pub mod components {
         pub name: CharacterNameFormat,
         pub aliases: Vec<String>,
     }
+
+    #[nvproc::bincode_derive]
+    #[nvproc::serde_derive]
+
+    pub enum BinaryDataType {
+        Video,
+        Audio,
+        Image,
+        Binary,
+    }
+    impl Default for BinaryDataType {
+        fn default() -> Self {
+            BinaryDataType::Image
+        }
+    }
     #[component]
-    pub struct BinaryDatumComponent {
+    pub struct BinaryComponent {
+        pub name: String,
+        pub description: String,
+        pub data_type: BinaryDataType,
         data: PathBuf,
     }
     #[component]
@@ -151,5 +149,4 @@ pub mod components {
         pub arc_description: String,
         pub arc_events: Vec<crate::Event>,
     }
-
 }
