@@ -1,5 +1,6 @@
 use std::io::{BufReader, BufWriter};
 
+use common::exports::bincode::config::Config;
 use common::exports::bincode::{Decode, Encode};
 
 use super::component::*;
@@ -129,6 +130,22 @@ pub fn test_common_store_serde() {
     let ccs2: &CommonComponentStore<StringFieldComponent> = ccs2.0.into_store();
     //compare
     assert_eq!(ccsc.get_name_ref(), ccs2.get_name_ref());
+
+    //store entire storage object
+    let mut store = Storage::new();
+    store.insert_default::<StringFieldComponent>(0);
+    store.insert_default::<StringFieldComponent>(1);
+    store.insert_default::<NameComponent>(0);
+    //serialize
+    let bw = BufWriter::new(Vec::new());
+    let res = bincode::encode_to_vec(store, bincode::config::standard()).unwrap();
+    let store2 = bincode::decode_from_slice::<Storage, bincode::config::Configuration>(
+        &*res,
+        bincode::config::standard(),
+    )
+    .unwrap()
+    .0;
+    //compare
 }
 #[test]
 fn test_storage_bincode() {
