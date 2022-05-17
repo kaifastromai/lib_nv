@@ -1,6 +1,8 @@
 pub mod component;
 pub mod prelude;
 mod tests;
+pub mod query;
+use crate::ecs::query::*;
 use self::component::archetypes::{Archetype, ArchetypeTy};
 
 use super::*;
@@ -864,7 +866,7 @@ impl Entman {
 
         ent
     }
-    //Removes the entity from the entity manager, and marks all it's components as orphaned.
+    //Removes the entity from the entity manager
     pub fn remove_entity(&mut self, entity: Id) {
         self.entities.remove(&entity);
         self.storage.remove_entity_components(entity);
@@ -940,7 +942,7 @@ impl Entman {
     ) -> Result<&Component<T>> {
         self.storage.get_component_with_id(id)
     }
-    //Get's all components of a common type beling to an entity.
+    //Get's all components of a common type belonging to an entity.
     pub fn get_components_of_type<T: ComponentTyReqs>(
         &self,
         entity: Id,
@@ -955,6 +957,10 @@ impl Entman {
             signature: sig,
             components,
         })
+    }
+    pub fn query <T:QueryTy>(query: &Query<T>) -> QueryResult {
+        let mut result = Vec::new();
+        todo!()
     }
 }
 
