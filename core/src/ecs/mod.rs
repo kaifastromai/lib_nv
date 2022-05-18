@@ -1,9 +1,9 @@
 pub mod component;
 pub mod prelude;
-mod tests;
 pub mod query;
-use crate::ecs::query::*;
+mod tests;
 use self::component::archetypes::{Archetype, ArchetypeTy};
+use crate::ecs::query::*;
 
 use super::*;
 use crate::ecs::component::*;
@@ -60,10 +60,10 @@ impl From<ComponentId> for u128 {
 }
 //A component type. It's id corrosponds to the entity it belongs to.
 pub trait ComponentTy: 'static {
-    fn get_type_id(&self) -> TypeId {
+    fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
-    fn get_type_name(&self) -> &'static str {
+    fn get_component_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
     fn get_component_name(&self) -> &'static str;
@@ -87,10 +87,10 @@ pub trait ComponentTyReqs: 'static + Clone + ComponentTy {
 }
 impl<T: ComponentTy + Clone> ComponentTyReqs for T {}
 impl ComponentTy for () {
-    fn get_type_id(&self) -> TypeId {
+    fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<()>()
     }
-    fn get_type_name(&self) -> &'static str {
+    fn get_component_type_name(&self) -> &'static str {
         std::any::type_name::<()>()
     }
     fn get_component_name(&self) -> &'static str {
@@ -139,10 +139,18 @@ impl Signature {
     pub fn contains(&self, type_id: TypeId) -> bool {
         self.0.contains(&type_id)
     }
+    pub fn merge(&mut self, other: &Signature) {
+        self.0.extend(other.0.iter().cloned());
+    }
 }
 impl From<Vec<TypeId>> for Signature {
     fn from(vec: Vec<TypeId>) -> Self {
         Signature(vec)
+    }
+}
+impl From<TypeId> for Signature {
+    fn from(type_id: TypeId) -> Self {
+        Signature(vec![type_id])
     }
 }
 
@@ -958,10 +966,9 @@ impl Entman {
             components,
         })
     }
-    pub fn query <T:QueryTy>(query: &Query<T>) -> QueryResult {
-        let mut result = Vec::new();
-        todo!()
-    }
+    // pub fn query<T: QueryTy>(query: &Query<T>) -> QueryResult {
+    //     todo!()
+    // }
 }
 
 #[cfg(test)]
