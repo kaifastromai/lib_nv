@@ -58,7 +58,7 @@ impl From<ComponentId> for u128 {
         id.id
     }
 }
-//A component type. It's id corrosponds to the entity it belongs to.
+//A component type.
 pub trait ComponentTy: 'static {
     fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<Self>()
@@ -78,10 +78,10 @@ pub trait ComponentTy: 'static {
 }
 
 pub trait ComponentTyReqs: 'static + Clone + ComponentTy {
-    fn get_type_id() -> TypeId {
+    fn get_req_component_type_id() -> TypeId {
         TypeId::of::<Self>()
     }
-    fn get_type_name() -> &'static str {
+    fn get_req_type_name() -> &'static str {
         std::any::type_name::<Self>()
     }
 }
@@ -249,13 +249,13 @@ impl dyn CommonComponentStoreTy {
     fn get_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-    fn into_store<T: ComponentTyReqs>(&self) -> &CommonComponentStore<T> {
+    fn into_store<T: ComponentTyReqs>(&self) -> Result<&CommonComponentStore<T>> {
         //convert to Any
         //convert to CommonComponentStore
         let any: &CommonComponentStore<T> = self
             .downcast_ref()
-            .expect("Could not downcast to CommonComponentStore");
-        any
+            .ok_or(anyhow!("Could not downcast to CommonComponentStore"))?;
+        Ok(any)
     }
     fn into_store_mut<T: ComponentTyReqs>(&mut self) -> &mut CommonComponentStore<T> {
         self.get_any_mut()
@@ -572,11 +572,11 @@ impl<T: ComponentTyReqs> CommonComponentStore<T> {
             .remove(&component_id);
         Ok(())
     }
-    pub fn remove_entity_components_internal(&mut self, owning_entity: Id) -> Result<()> {
+    fn remove_entity_components_internal(&mut self, owning_entity: Id) -> Result<()> {
         self.components.remove(&owning_entity);
         Ok(())
     }
-    pub fn get_owned_entity_components_internal(
+    fn get_owned_entity_components_internal(
         &self,
         owning_entity: Id,
     ) -> Result<Vec<DynamicComponent>> {
@@ -701,7 +701,7 @@ impl Storage {
             true => {
                 let store = self.bins.get(&id).unwrap();
                 //downcast to the correct type
-                let store: &CommonComponentStore<T> = store.into_store();
+                let store: &CommonComponentStore<T> = store.into_store().unwrap();
 
                 match store.components.get(&entity) {
                     Some(component) => component.get(&component_id).ok_or(anyhow!(
@@ -730,7 +730,7 @@ impl Storage {
             true => {
                 let store = self.bins.get(&id).unwrap();
                 //downcast to the correct type
-                let store = store.into_store();
+                let store = store.into_store().unwrap();
                 //iterate over all components and return the first one that matches
                 for (_, component) in store.components.iter() {
                     if component.contains_key(&component_id) {
@@ -754,15 +754,30 @@ impl Storage {
             true => {
                 let mut res = Vec::<&Component<T>>::new();
 
+                let mut entity_contains_component_type = false;
                 //iterate through all component stores, and get the components and add to the list
                 for (_, store) in self.bins.iter() {
-                    let store: &CommonComponentStore<T> = store.into_store();
+                    let store = store.into_store();
 
-                    if let Some(component) = store.components.get(&entity) {
-                        res.append(&mut component.values().collect::<Vec<&Component<T>>>());
+                    match store {
+                        Ok(store) => {
+                            entity_contains_component_type = true;
+                            if let Some(component) = store.components.get(&entity) {
+                                res.append(&mut component.values().collect::<Vec<&Component<T>>>());
+                            }
+                        }
+                        Err(_) => {}
                     }
                 }
-                Ok(res)
+                if entity_contains_component_type {
+                    Ok(res)
+                } else {
+                    Err(anyhow!(
+                        "Entity {} does not have any components of type {}",
+                        entity,
+                        T::get_name()
+                    ))
+                }
             }
             false => Err(anyhow!(
                 "No component store of type {} has yet been created",
@@ -891,8 +906,8 @@ impl Entman {
         ent.add_component::<T>()?;
         component_id
     }
-    //Adds a component to an entity, calling the default "constructor"
-    pub fn add_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
+    ///Adds a component to an entity, calling the default "constructor"
+    pub fn add_component_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
         &mut self,
         entity: Id,
     ) -> Result<ComponentId> {

@@ -261,7 +261,7 @@ pub fn generate_component_types(_attr: TokenStream, item: TokenStream) -> TokenS
             pub fn serialize(name:&str, store:&Box<dyn crate::ecs::CommonComponentStoreTy>,encoder: &mut  impl bincode::enc::Encoder)->Result<(),bincode::error::EncodeError>{
                 match name {
                     #(#comp_type_strings=>{
-                        let mut _s=store.into_store::<#comp_type_idents>();
+                        let mut _s=store.into_store::<#comp_type_idents>().unwrap();
                         //write the name of the component
                         _s.encode(encoder)
                     },)*

@@ -3,6 +3,8 @@
 #![feature(generic_arg_infer)]
 #![feature(trait_upcasting)]
 #![feature(unboxed_closures, fn_traits)]
+#![feature(generic_const_exprs)]
+#![feature(adt_const_params)]
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 mod action;
