@@ -897,5 +897,53 @@ pub fn query_predicate(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
     .into()
 }
+///Generates the 16 tuple impls for the [QueryTy] trait
+#[proc_macro]
+pub fn generate_query_ty_tuple_impls(item: TokenStream) -> TokenStream {
+    //generate the 16 tuple impls for QueryTy trait.
+    let mut impl_header = Vec::new();
+    let mut names = Vec::new();
+    for i in 0..16 {
+        let name = syn::Ident::new(&format!("R{}", i), Span::call_site());
+        names.push(name);
+        impl_header.push(quote! {
+            impl <name:QueryTy> QueryTy for (name,)
+        });
+    }
+
+    let mut impl_body = Vec::new();
+
+    /*for (#(#sub_lists,)*){
+    fn generate_sig()->Signature{
+        vec![#(#sub_lists ::generate_sig()),*].into()
+    }
+    fn contains<Q:ComponentTy>()->bool{
+        #(#sub_lists ::contains::<Q>())||*
+    }
+    */
+    for i in 1..17 {
+        let sub_list = names
+            .clone()
+            .into_iter()
+            .take(i)
+            .collect::<Vec<syn::Ident>>();
+
+        impl_body.push(quote! {
+            impl <#(#sub_list: QueryTy,)*> QueryTy for (#(#sub_list,)*)  {
+                fn generate_sig()->Signature{
+                    vec![#(#sub_list ::generate_sig()),*].into()
+                }
+                fn contains<Q:ComponentTy>()->bool{
+                    #(#sub_list ::contains::<Q>())||*
+                }
+            }
+        });
+    }
+
+    quote! {
+        #(#impl_body)*
+    }
+    .into()
+}
 #[cfg(test)]
 mod tests;

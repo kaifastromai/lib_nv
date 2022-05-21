@@ -153,6 +153,15 @@ impl From<TypeId> for Signature {
         Signature(vec![type_id])
     }
 }
+impl From<Vec<Signature>> for Signature {
+    fn from(vec: Vec<Signature>) -> Self {
+        let mut sig = Signature::new();
+        for s in vec {
+            sig.merge(&s);
+        }
+        sig
+    }
+}
 
 #[derive(Debug)]
 #[nvproc::bincode_derive]
@@ -988,17 +997,18 @@ impl Entman {
     ) -> Vec<EntityRef> {
         let sig = Q::generate_sig();
         //iterate over all entities, and check if they match the signature of the query
-        let mut result = Vec::new();
+        let mut ids = Vec::new();
         for (id, entity) in self.entities.iter() {
             if entity.get_signature() == sig {
-                let entity_ref = self.get_entity_ref(id.clone()).unwrap();
+                let id = id;
+
                 let qf = QueryFetch::new(*id, &self);
                 if query.predicate().check(qf) {
-                    result.push(entity_ref);
+                    ids.push(id);
                 }
             }
         }
-        result
+        todo!()
     }
 }
 
