@@ -159,21 +159,21 @@ impl From<TypeId> for Signature {
 pub struct Entity {
     id: Id,
     is_alive: bool,
-    components: Signature,
+    sig: Signature,
 }
 impl Entity {
     pub fn new(id: Id) -> Self {
         Self {
             id,
             is_alive: true,
-            components: Signature::new(),
+            sig: Signature::new(),
         }
     }
     pub fn from_sig(id: Id, sig: Signature) -> Self {
         Self {
             id,
             is_alive: true,
-            components: sig,
+            sig,
         }
     }
     pub fn is_valid(&self) -> bool {
@@ -184,24 +184,24 @@ impl Entity {
     }
     pub fn add_component<T: ComponentTyReqs>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
-        self.components.add(tid);
+        self.sig.add(tid);
 
         Ok(())
     }
     pub fn remove_component<T: ComponentTyReqs>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
-        self.components.remove_component(tid)?;
+        self.sig.remove_component(tid)?;
         Ok(())
     }
     pub fn has_component<T: ComponentTyReqs>(&self) -> bool {
         let tid = TypeId::of::<T>();
-        self.components.contains(tid)
+        self.sig.contains(tid)
     }
     pub fn get_signature(&self) -> Signature {
-        self.components.clone()
+        self.sig.clone()
     }
     pub fn get_signature_ref(&self) -> &Signature {
-        &self.components
+        &self.sig
     }
 }
 
@@ -981,9 +981,25 @@ impl Entman {
             components,
         })
     }
-    // pub fn query<T: QueryTy>(query: &Query<T>) -> QueryResult {
-    //     todo!()
-    // }
+    ///Runs the given query, returning a vector of entities that match the query.
+    pub fn query<'a, Q: QueryTy, P: PredicateTy<'a, Q>>(
+        &'a self,
+        query: &ecs::query::Query<'a, Q, P>,
+    ) -> Vec<EntityRef> {
+        let sig = Q::generate_sig();
+        //iterate over all entities, and check if they match the signature of the query
+        let mut result = Vec::new();
+        for (id, entity) in self.entities.iter() {
+            if entity.get_signature() == sig {
+                let entity_ref = self.get_entity_ref(id.clone()).unwrap();
+                let qf = QueryFetch::new(*id, &self);
+                if query.predicate().check(qf) {
+                    result.push(entity_ref);
+                }
+            }
+        }
+        result
+    }
 }
 
 #[cfg(test)]

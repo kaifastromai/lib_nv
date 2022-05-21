@@ -452,45 +452,66 @@ mod query_impls {
 }
 
 ///The [NullPredicate] always returns true. For internal use only.
-struct NullPredicate<T> {
+pub struct NullPredicate<T> {
     _marker: PhantomData<T>,
 }
-impl<Q: QueryTy> PredicateTy<Q> for NullPredicate<Q> {
+impl<T> NullPredicate<T> {
+    pub fn new() -> Self {
+        NullPredicate {
+            _marker: PhantomData,
+        }
+    }
+}
+impl<'em, Q: QueryTy> PredicateTy<'em, Q> for NullPredicate<Q> {
     fn check(&self, _: QueryFetch<Q>) -> bool {
         true
     }
 }
 
-pub trait PredicateTy<Q>
+///Lifetime 'em refers to the lifetime of the borrowed Entman construct.
+pub trait PredicateTy<'em, Q>
 where
     Q: QueryTy,
 {
-    fn check(&self, fetch: QueryFetch<Q>) -> bool;
+    fn check(&self, fetch: QueryFetch<'em, Q>) -> bool;
 }
-impl<Q: QueryTy, T: Fn<(QueryFetch<Q>,), Output = bool>> PredicateTy<Q> for T {
-    fn check(&self, fetch: QueryFetch<Q>) -> bool {
+impl<'em, Q: QueryTy, T: Fn<(QueryFetch<'em, Q>,), Output = bool>> PredicateTy<'em, Q> for T {
+    fn check(&self, fetch: QueryFetch<'em, Q>) -> bool {
         self(fetch)
     }
 }
 ///A [Query] that retrieves components, or Entities from} the ECS (Entman)
-pub struct Query<T: QueryTy, P = NullPredicate<T>>
+pub struct Query<'em, T: QueryTy, P = NullPredicate<T>>
 where
-    P: PredicateTy<T>,
+    P: PredicateTy<'em, T>,
 {
-    phantom: std::marker::PhantomData<T>,
+    phantom: std::marker::PhantomData<&'em T>,
     predicate: P,
     matching_entities: Option<Vec<Id>>,
 }
-impl<T: QueryTy, P: PredicateTy<T>> Query<T, P> {
-    fn new(p: P) -> Self {
+impl<'em, T: QueryTy, P: PredicateTy<'em, T>> Query<'em, T, P> {
+    pub fn from_pred(p: P) -> Self {
         Query {
             phantom: std::marker::PhantomData,
             predicate: p,
             matching_entities: None,
         }
     }
+
     fn get_query_sig() -> Signature {
         T::generate_sig()
+    }
+    pub fn predicate(&self) -> &P {
+        &self.predicate
+    }
+}
+impl<'em, T: QueryTy> Query<'em, T, NullPredicate<T>> {
+    pub fn new() -> Self {
+        Query {
+            phantom: std::marker::PhantomData,
+            predicate: NullPredicate::new(),
+            matching_entities: None,
+        }
     }
 }
 struct ConstAssert<const Assert: bool> {}
@@ -498,33 +519,28 @@ struct ConstAssert<const Assert: bool> {}
 ///A query fetch allows statically known access to the components of an entity (hopefully).
 /// It essentially a wrapper over an Entity, but allows direct access to the components since
 /// We can be guaranteed that components exist.
-pub struct QueryFetch<T: QueryTy> {
+pub struct QueryFetch<'em, T: QueryTy> {
     phantom: std::marker::PhantomData<T>,
-    entity_ids: Vec<Id>,
-    component_ids: Vec<Id>,
+    entity_id: Id,
+
+    entman_ref: &'em Entman,
 }
-impl<T: QueryTy> QueryFetch<T> {
-    fn new(entity_ids: Vec<Id>, component_ids: Vec<Id>) -> Self {
+impl<'a, T: QueryTy> QueryFetch<'a, T> {
+    pub fn new(entity_id: Id, entman_ref: &'a Entman) -> Self {
         QueryFetch {
             phantom: std::marker::PhantomData,
-            entity_ids,
-            component_ids,
+            entity_id,
+            entman_ref,
         }
     }
-    fn get_components<'a, C: ComponentTyReqs>(
-        &'a self,
-        entman: &'a Entman,
-        entity: Id,
-    ) -> Result<Vec<&Component<C>>>
-    where
-        ConstAssert<{ T::contains::<C>() }>:,
-    {
-        let signature = C::generate_sig();
-        let comp_id = C::get_type_id();
+    //Returns all components of the given type for the entity the QueryFetch is associated with.
+    fn get_components<C: ComponentTyReqs>(&'a self) -> Result<Vec<&Component<C>>> {
         //check if comp sig exists in signature
-        if signature.contains(comp_id) {
+        if T::contains::<C>() {
             //access component
-            let component = entman.get_components_of_type::<C>(entity)?;
+            let component = self
+                .entman_ref
+                .get_components_of_type::<C>(self.entity_id)?;
             return Ok(component);
         }
         Err(anyhow!("Component does not match signature"))
@@ -534,6 +550,11 @@ impl<T: QueryTy> QueryFetch<T> {
 pub struct QueryResult {}
 ///A sytem type is one that can execute logic on a given query
 pub struct SystemTy {}
+#[nvproc::query_predicate]
+fn bob_predicate(f: QueryFetch<NameComponent>) -> bool {
+    //Select entities with the name Bob
+    name_components.into_iter().any(|c| c.name == "Bob")
+}
 
 #[cfg(test)]
 mod test_query {
@@ -541,10 +562,6 @@ mod test_query {
     use crate::ecs::component::components::*;
 
     use super::*;
-
-    fn test_pred(fetch: QueryFetch<LocationComponent>) -> bool {
-        true
-    }
 
     #[test]
     fn test_sig_gen() {
@@ -560,29 +577,58 @@ mod test_query {
         let pred = |fetch: QueryFetch<(LocationComponent, NameComponent)>| -> bool {
             return true;
         };
-        let q = Query::new(pred);
+        let q = Query::from_pred(pred);
     }
     #[test]
     fn test_query_fetch() {
         let mut entman = Entman::new();
-        let ent_id = entman.add_entity();
-        let loc_id = entman
-            .add_component_default::<LocationComponent>(ent_id)
+        let ent1 = entman.add_entity();
+        let ent2 = entman.add_entity();
+        let ent3 = entman.add_entity();
+        let ent4 = entman.add_entity();
+
+        entman
+            .add_component::<NameComponent>(
+                ent1,
+                NameComponent {
+                    name: "Bob".to_string(),
+                    aliases: vec![],
+                },
+            )
             .unwrap();
-        let name_id = entman
-            .add_component_default::<NameComponent>(ent_id)
-            .unwrap();
-        let fetch = QueryFetch::<(LocationComponent, NameComponent)>::new(
-            vec![ent_id],
-            vec![loc_id.into(), name_id.into()],
+        entman.add_component_default::<StringFieldComponent>(ent2);
+        entman.add_component_default::<StringFieldComponent>(ent3);
+        entman.add_component(
+            ent4,
+            NameComponent {
+                name: "Jane".to_string(),
+                aliases: vec![],
+            },
         );
-        let loc_comp = fetch
-            .get_components::<LocationComponent>(&entman, ent_id)
-            .unwrap();
-        let name_comp = fetch
-            .get_components::<NameComponent>(&entman, ent_id)
-            .unwrap();
-        assert_eq!(loc_comp.len(), 1);
-        assert_eq!(name_comp.len(), 1);
+        let q = Query::from_pred(bob_predicate);
+        let qres = entman.query(&q);
+        assert_eq!(qres.len(), 1);
+        assert_eq!(qres[0].id, ent1);
+        //test null predicate
+        let q2 = Query::<NameComponent>::new();
+        let qres2 = entman.query(&q2);
+        assert_eq!(qres2.len(), 2);
+
+        //test multiple components
+        let q3 = Query::<(NameComponent, StringFieldComponent)>::new();
+
+        //add extra components to ent1
+        entman.add_component(
+            ent1,
+            StringFieldComponent {
+                name: "Name".to_string(),
+                value: "Bob".to_string(),
+            },
+        );
+
+        let qres3 = entman.query(&q3);
+        assert_eq!(qres3.len(), 1);
+        assert_eq!(qres3[0].id, ent1);
+        
     }
 }

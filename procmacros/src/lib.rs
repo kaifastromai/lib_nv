@@ -5,7 +5,9 @@ use quote::{format_ident, quote, ToTokens, __private::Span};
 use std::{fs::File, hash::*, io::Read};
 use syn::{
     parse::{Parse, Parser},
-    parse_macro_input, DeriveInput, Field,
+    parse_macro_input,
+    spanned::Spanned,
+    DeriveInput, Field,
 };
 const SERDE_EXPORT_PATH: &str = "common::exports::serde";
 const BINCODE_EXPORT_PATH: &str = "common::exports::bincode";
@@ -763,5 +765,137 @@ pub fn file_to_static_string(file: TokenStream) -> TokenStream {
     .into()
 }
 
+///Decorates a function with the necessary polyfill to allow accessing a QueryFetch
+/// component from within the function. The function must be of
+/// the form: fn(ecs::QueryFetch<T>)->bool, where T is some type of component
+#[proc_macro_attribute]
+pub fn query_predicate(attr: TokenStream, item: TokenStream) -> TokenStream {
+    //make sure it is a function
+    let mut input = syn::parse_macro_input!(item as syn::ItemFn);
+    //get the function body
+    let body = input.block.clone();
+
+    //the ident of the first argument to the function
+    let mut arg_ident = syn::Ident::new("fetch", Span::call_site());
+    //get function signature
+    let sig = input.sig;
+    //make sure arguments are correct
+    let mut components_list = Vec::new();
+    if sig.inputs.len() == 1 {
+        if let syn::FnArg::Typed(t) = sig.inputs.first().unwrap() {
+            if let syn::Pat::Ident(i) = &*t.pat {
+                arg_ident = i.ident.clone();
+            } else {
+                panic!("Expected a single argument of type QueryFetch<T>");
+            }
+
+            if let syn::Type::Path(p) = &*t.ty {
+                if let Some(seg) = p.path.segments.first() {
+                    if seg.ident != "QueryFetch" {
+                        sig.span()
+                            .unwrap()
+                            .error("Expected QueryFetch as first argument")
+                            .emit();
+                    }
+                    //get the generic arg for the QueryFetch<T>
+                    if let syn::PathArguments::AngleBracketed(a) = &seg.arguments {
+                        if let Some(gt) = a.args.first() {
+                            if let syn::GenericArgument::Type(gt_sub_type) = gt {
+                                //must either be a Path (a single component) or a Tuple of Paths (Components)
+                                if let syn::Type::Path(comp_path) = gt_sub_type {
+                                    if let Some(comp_seg) = comp_path.path.segments.first() {
+                                        components_list = vec![comp_seg.ident.clone()];
+                                    }
+                                } else if let syn::Type::Tuple(comp_tuples) = gt_sub_type {
+                                    //create vector of idents of the tuples
+                                    components_list = comp_tuples
+                                        .elems
+                                        .iter()
+                                        .map(|tuple_args| {
+                                            if let syn::Type::Path(p) = tuple_args {
+                                                if let Some(seg) = p.path.segments.first() {
+                                                    seg.ident.clone()
+                                                } else {
+                                                    sig.span()
+                                                        .unwrap()
+                                                        .error("Expected a path")
+                                                        .emit();
+                                                    panic!("");
+                                                }
+                                            } else {
+                                                sig.span().unwrap().error("Expected a path").emit();
+                                                panic!("");
+                                            }
+                                        })
+                                        .collect();
+                                } else {
+                                    sig.span()
+                                        .unwrap()
+                                        .error("Expected a path or a tuple of paths")
+                                        .emit();
+                                    panic!("");
+                                }
+                            } else {
+                                sig.span()
+                                    .unwrap()
+                                    .error("Expected QueryFetch<T> as first argument")
+                                    .emit();
+                            }
+                        } else {
+                            sig.span()
+                                .unwrap()
+                                .error("Must provide component list as generic argument.")
+                                .emit();
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        panic!("QueryFetch must be the first argument");
+    }
+    //check that the return type is bool
+    if let syn::ReturnType::Type(_, t) = &sig.output {
+        if let syn::Type::Path(p) = &(**t) {
+            if let Some(seg) = p.path.segments.first() {
+                if seg.ident != "bool" {
+                    sig.span()
+                        .unwrap()
+                        .error("A predicate must return a bool")
+                        .emit();
+                }
+            }
+        }
+    }
+    //convert component_list idents to snake_case strings
+    let components_list_snake = components_list
+        .iter()
+        .map(|ident| {
+            let mut s = ident.to_string().to_snake_case();
+            //add s to end of string
+            s += "s";
+            syn::Ident::new(&s, ident.span())
+        })
+        .collect::<Vec<syn::Ident>>();
+    let polyfill = quote! {
+        #(let #components_list_snake=#arg_ident.get_components::<#components_list>().unwrap();)*
+
+    };
+    //remove opening and brackets from body
+    let body_stmts = (*body).stmts;
+    //insert polyfill before body
+    let new_body = quote! {
+        #polyfill
+       #( #body_stmts)*
+    };
+
+    quote! {
+
+        #sig{
+        #new_body
+        }
+    }
+    .into()
+}
 #[cfg(test)]
 mod tests;
