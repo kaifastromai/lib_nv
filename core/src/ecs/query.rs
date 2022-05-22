@@ -31,6 +31,38 @@ impl<'a, T: TypeIdTy + ComponentTy> QueryTy for T {
     // }
 }
 
+pub trait IntoTuple<T> {
+    fn into_tuple(&self) -> Result<T>;
+    fn into_tuple_ref(&self) -> Result<T>;
+}
+impl<R1: ComponentTyReqs, R2: ComponentTyReqs> IntoTuple<(R1, R2)> for Vec<&dyn ComponentTy> {
+    fn into_tuple(&self) -> Result<(R1, R2)> {
+        (
+            //make sure that the size of the vec is 2
+            if (self.len() == 2) {
+                let c1: R1 = if let Some(c) = self[0].downcast_ref::<R1>() {
+                    c.clone()
+                } else if let Some(c) = self[1].downcast_ref::<R1>() {
+                    c.clone()
+                } else {
+                    return Err(anyhow!("Could not downcast"));
+                };
+                let c2: R2 = if let Some(c) = self[1].downcast_ref::<R2>() {
+                    c.clone()
+                } else if let Some(c) = self[0].downcast_ref::<R2>() {
+                    c.clone()
+                } else {
+                    return Err(anyhow!("Could not downcast"));
+                };
+
+                Ok((c1, c2))
+            } else {
+                return Err(anyhow!("Vec<&dyn ComponentTy> must have size 2"));
+            }
+        )
+    }
+}
+
 nvproc::generate_query_ty_tuple_impls!();
 
 ///The [NullPredicate] always returns true. For internal use only.
@@ -115,14 +147,12 @@ impl<'a, T: QueryTy> QueryFetch<'a, T> {
             entman_ref,
         }
     }
-    //Returns all components of the given type for the entity the QueryFetch is associated with.
-    fn get_components<C: ComponentTyReqs>(&'a self) -> Result<Vec<&Component<C>>> {
+    //Returns component of the given type for the entity the QueryFetch is associated with.
+    fn get_component<C: ComponentTyReqs>(&'a self) -> Result<&Component<C>> {
         //check if comp sig exists in signature
         if T::contains::<C>() {
             //access component
-            let component = self
-                .entman_ref
-                .get_components_of_type::<C>(self.entity_id)?;
+            let component = self.entman_ref.get_component_ref::<C>(self.entity_id)?;
             return Ok(component);
         }
         Err(anyhow!("Component does not match signature"))
@@ -151,8 +181,7 @@ impl<'qr, T: QueryTy> QueryResult<'qr, T> {
 pub struct SystemTy {}
 #[nvproc::query_predicate]
 fn bob_predicate(f: QueryFetch<NameComponent>) -> bool {
-    //Select entities with the name Bob
-    name_components.into_iter().any(|c| c.name == "Bob")
+    name_component.component.name == "Bob"
 }
 
 #[cfg(test)]
@@ -222,5 +251,21 @@ mod test_query {
                 value: "Bob".to_string(),
             },
         );
+    }
+    #[test]
+    fn test_into_tuple() {
+        let mut entman = Entman::new();
+        let ent1 = entman.add_entity();
+        //add two components to ent1
+        entman.add_component_default::<NameComponent>(ent1);
+        entman.add_component_default::<LocationComponent>(ent1);
+        //get all components as vector
+        let comps = entman.get_components_dyn_ref(ent1).unwrap();
+        let (loc, name): (&LocationComponent, &NameComponent) = comps.into_tuple().unwrap();
+        assert_eq!(name.name, String::default());
+        //check in reverse
+        let (name, loc): (NameComponent, LocationComponent) = comps.into_tuple().unwrap();
+        assert_eq!(name.name, String::default());
+        print!("Hello");
     }
 }

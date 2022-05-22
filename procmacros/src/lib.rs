@@ -871,14 +871,12 @@ pub fn query_predicate(attr: TokenStream, item: TokenStream) -> TokenStream {
     let components_list_snake = components_list
         .iter()
         .map(|ident| {
-            let mut s = ident.to_string().to_snake_case();
-            //add s to end of string
-            s += "s";
+            let  s = ident.to_string().to_snake_case();
             syn::Ident::new(&s, ident.span())
         })
         .collect::<Vec<syn::Ident>>();
     let polyfill = quote! {
-        #(let #components_list_snake=#arg_ident.get_components::<#components_list>().unwrap();)*
+        #(let #components_list_snake=#arg_ident.get_component::<#components_list>().unwrap();)*
 
     };
     //remove opening and brackets from body

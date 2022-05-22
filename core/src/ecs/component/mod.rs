@@ -129,16 +129,24 @@ pub mod components {
             BinaryDataType::Image
         }
     }
-    #[component]
-    pub struct BinaryComponent {
+
+    #[nvproc::bincode_derive]
+    #[nvproc::serde_derive]
+    pub struct BinaryComponentElement {
         pub name: String,
         pub description: String,
         pub data_type: BinaryDataType,
         data: PathBuf,
     }
+
+    #[component]
+    pub struct BinaryComponent {
+        elements: Vec<BinaryComponentElement>,
+    }
+
     #[component]
     pub struct RelationshipComponent {
-        pub relationship: relationship::Relationship,
+        pub relationships: Vec<relationship::Relationship>,
     }
 
     ///An [Arc] component is a series of events related to a single entity and

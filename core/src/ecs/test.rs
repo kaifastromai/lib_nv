@@ -27,26 +27,23 @@ fn test_add_component() {
 fn test_get_component() {
     let mut em = Entman::new();
     let entity = em.add_entity();
-    let comp_id = em
-        .add_component::<StringFieldComponent>(
-            entity,
-            StringFieldComponent {
-                name: "name".to_string(),
-                value: "value".to_string(),
-            },
-        )
-        .unwrap();
+    em.add_component::<StringFieldComponent>(
+        entity,
+        StringFieldComponent {
+            name: "name".to_string(),
+            value: "value".to_string(),
+        },
+    )
+    .unwrap();
     let field = em
-        .get_entity_component_by_id::<StringFieldComponent>(entity, comp_id)
+        .get_component_ref::<StringFieldComponent>(entity)
         .unwrap();
 
     assert_eq!(field.name, "name");
     assert_eq!(field.value, "value");
     {
-        let name_comp_id = em.add_component_default::<NameComponent>(entity).unwrap();
-        let name_comp = em
-            .get_entity_component_by_id::<NameComponent>(entity, name_comp_id)
-            .unwrap();
+        em.add_component_default::<NameComponent>(entity);
+        let name_comp = em.get_component_ref::<NameComponent>(entity).unwrap();
         assert_eq!(name_comp.name, String::default());
     }
     //get solely by id
@@ -54,7 +51,7 @@ fn test_get_component() {
         .add_component_default::<StringFieldComponent>(entity)
         .unwrap();
     let field_comp = em
-        .get_component_with_id::<StringFieldComponent>(field_comp_id)
+        .get_component_ref::<StringFieldComponent>(entity)
         .unwrap();
     assert_eq!(field_comp.name, String::default());
     assert_eq!(field_comp.value, String::default());
@@ -153,18 +150,16 @@ pub fn test_common_store_serde() {
 fn test_storage_bincode() {
     let mut s = Storage::new();
     s.insert_default::<NameComponent>(0);
-    s.insert_default::<StringFieldComponent>(1);
+    s.insert_default::<StringFieldComponent>(0);
     let res = bincode::encode_to_vec(&s, bincode::config::standard()).unwrap();
     let s2 = bincode::decode_from_slice::<Storage, bincode::config::Configuration>(
         &*res,
         bincode::config::standard(),
     )
     .unwrap();
-    let comp2 =
-        s2.0.get_components_of_type::<StringFieldComponent>(0)
-            .unwrap();
-    let comp1 = s.get_components_of_type::<StringFieldComponent>(0).unwrap();
-    assert_eq!(comp1.len(), comp2.len());
+    let comp2 = s2.0.get_component_ref::<StringFieldComponent>(0).unwrap();
+    let comp1 = s.get_component_ref::<StringFieldComponent>(0).unwrap();
+    assert_eq!(comp1.id, comp2.id);
 }
 
 #[test]
