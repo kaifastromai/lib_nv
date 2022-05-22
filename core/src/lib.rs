@@ -5,6 +5,7 @@
 #![feature(unboxed_closures, fn_traits)]
 #![feature(generic_const_exprs)]
 #![feature(adt_const_params)]
+#![feature(associated_type_defaults)]
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 mod action;

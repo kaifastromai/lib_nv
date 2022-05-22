@@ -395,10 +395,10 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
           fn get_component_name(&self)->&'static str{
              #name_str
           }
-          fn get_any(&self)->&dyn std::any::Any{
+          fn get_any(&self)->&dyn crate::ecs::ComponentTy{
              self
           }
-          fn get_any_mut(&mut self)->&mut dyn std::any::Any{
+          fn get_any_mut(&mut self)->&mut dyn crate::ecs::ComponentTy{
              self
           }
           //returns the type of the component as a variant of EComponentTypes
@@ -936,6 +936,7 @@ pub fn generate_query_ty_tuple_impls(item: TokenStream) -> TokenStream {
                 fn contains<Q:ComponentTy>()->bool{
                     #(#sub_list ::contains::<Q>())||*
                 }
+
             }
         });
     }

@@ -13,18 +13,26 @@ pub trait QueryTy {
     fn contains<T: ComponentTy>() -> bool;
 }
 //implement QueryTy for all T that implement TypeIdTy and are ComponentTy
-impl<T: TypeIdTy + ComponentTy> QueryTy for T {
+impl<'a, T: TypeIdTy + ComponentTy> QueryTy for T {
     fn generate_sig() -> Signature {
         <T as TypeIdTy>::get_type_id().into()
     }
     fn contains<Q: ComponentTy>() -> bool {
         <Q as TypeIdTy>::get_type_id() == <T as TypeIdTy>::get_type_id()
     }
+
+    // fn from_vec(v: Vec<Vec<&dyn ComponentTy>>) -> &Self {
+    //     //we know that the size of this vec must be 1
+    //     let comps = v.into_iter().next().unwrap();
+    //     //take first
+    //     let comp = comps.into_iter().next().unwrap();
+    //     //downcast
+    //     comp.downcast_ref().unwrap()
+    // }
 }
 
 nvproc::generate_query_ty_tuple_impls!();
 
- 
 ///The [NullPredicate] always returns true. For internal use only.
 pub struct NullPredicate<T> {
     _marker: PhantomData<T>,
@@ -131,9 +139,9 @@ impl<'qr, T: QueryTy> QueryResult<'qr, T> {
         entities: impl IntoIterator<Item = Id>,
         components: impl IntoIterator<Item = Vec<&'qr T>>,
     ) -> Self {
-        let mut matches = BTreeMap::new();
-        for (entity, components) in entities.into_iter().zip(components.into_iter()) {
-            matches.insert(entity, components);
+        let mut matches = BTreeMap::<Id, Vec<&T>>::new();
+        for (entity, comp) in entities.into_iter().zip(components.into_iter()) {
+            matches.insert(entity, comp);
         }
 
         QueryResult { matches }
@@ -198,12 +206,10 @@ mod test_query {
         );
         let q = Query::from_pred(bob_predicate);
         let qres = entman.query(&q);
-        assert_eq!(qres.len(), 1);
-        assert_eq!(qres[0].id, ent1);
+
         //test null predicate
         let q2 = Query::<NameComponent>::new();
         let qres2 = entman.query(&q2);
-        assert_eq!(qres2.len(), 2);
 
         //test multiple components
         let q3 = Query::<(NameComponent, StringFieldComponent)>::new();
@@ -216,9 +222,5 @@ mod test_query {
                 value: "Bob".to_string(),
             },
         );
-
-        let qres3 = entman.query(&q3);
-        assert_eq!(qres3.len(), 1);
-        assert_eq!(qres3[0].id, ent1);
     }
 }
