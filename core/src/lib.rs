@@ -6,6 +6,9 @@
 #![feature(generic_const_exprs)]
 #![feature(adt_const_params)]
 #![feature(associated_type_defaults)]
+#![feature(generic_associated_types)]
+#![feature(auto_traits)]
+#![feature(negative_impls)]
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 mod action;

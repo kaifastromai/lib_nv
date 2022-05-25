@@ -59,7 +59,7 @@ impl From<ComponentId> for u128 {
     }
 }
 //A component type.
-pub trait ComponentTy:  Any {
+pub trait ComponentTy: Any {
     fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -327,11 +327,13 @@ impl dyn CommonComponentStoreTy {
         any.downcast_ref::<T>()
     }
 }
+
 impl dyn ComponentTy {
     fn downcast_ref<T: Any>(&self) -> Option<&T> {
         let any: &dyn Any = self;
         any.downcast_ref::<T>()
     }
+
 }
 impl<T: ComponentTyReqs> CommonComponentStoreTy for CommonComponentStore<T> {
     fn get_type_id(&self) -> TypeId {

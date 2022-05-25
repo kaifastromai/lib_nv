@@ -11,6 +11,7 @@ use super::*;
 pub trait QueryTy {
     fn generate_sig() -> Signature;
     fn contains<T: ComponentTy>() -> bool;
+    fn from_dyn_vec(vec:Vec<&dyn ComponentTy>)->Result<Self>;
 }
 //implement QueryTy for all T that implement TypeIdTy and are ComponentTy
 impl<'a, T: TypeIdTy + ComponentTy> QueryTy for T {
@@ -20,48 +21,12 @@ impl<'a, T: TypeIdTy + ComponentTy> QueryTy for T {
     fn contains<Q: ComponentTy>() -> bool {
         <Q as TypeIdTy>::get_type_id() == <T as TypeIdTy>::get_type_id()
     }
-
-    // fn from_vec(v: Vec<Vec<&dyn ComponentTy>>) -> &Self {
-    //     //we know that the size of this vec must be 1
-    //     let comps = v.into_iter().next().unwrap();
-    //     //take first
-    //     let comp = comps.into_iter().next().unwrap();
-    //     //downcast
-    //     comp.downcast_ref().unwrap()
-    // }
-}
-
-pub trait IntoTuple<T> {
-    fn into_tuple(&self) -> Result<T>;
-    fn into_tuple_ref(&self) -> Result<T>;
-}
-impl<R1: ComponentTyReqs, R2: ComponentTyReqs> IntoTuple<(R1, R2)> for Vec<&dyn ComponentTy> {
-    fn into_tuple(&self) -> Result<(R1, R2)> {
-        (
-            //make sure that the size of the vec is 2
-            if (self.len() == 2) {
-                let c1: R1 = if let Some(c) = self[0].downcast_ref::<R1>() {
-                    c.clone()
-                } else if let Some(c) = self[1].downcast_ref::<R1>() {
-                    c.clone()
-                } else {
-                    return Err(anyhow!("Could not downcast"));
-                };
-                let c2: R2 = if let Some(c) = self[1].downcast_ref::<R2>() {
-                    c.clone()
-                } else if let Some(c) = self[0].downcast_ref::<R2>() {
-                    c.clone()
-                } else {
-                    return Err(anyhow!("Could not downcast"));
-                };
-
-                Ok((c1, c2))
-            } else {
-                return Err(anyhow!("Vec<&dyn ComponentTy> must have size 2"));
-            }
-        )
+    fn from_dyn_vec(vec:Vec<&dyn ComponentTy>)->Result<Self>{
+        
     }
 }
+
+//impl clone
 
 nvproc::generate_query_ty_tuple_impls!();
 
@@ -177,6 +142,12 @@ impl<'qr, T: QueryTy> QueryResult<'qr, T> {
         QueryResult { matches }
     }
 }
+macro_rules! into_tuple {
+    ($entman:expr, $ent:expr, $($type:ident),*) => {
+        ($($entman.get_component_ref::<$type>($ent).unwrap()),*)
+    };
+
+}
 ///A sytem type is one that can execute logic on a given query
 pub struct SystemTy {}
 #[nvproc::query_predicate]
@@ -259,13 +230,14 @@ mod test_query {
         //add two components to ent1
         entman.add_component_default::<NameComponent>(ent1);
         entman.add_component_default::<LocationComponent>(ent1);
-        //get all components as vector
-        let comps = entman.get_components_dyn_ref(ent1).unwrap();
-        let (loc, name): (&LocationComponent, &NameComponent) = comps.into_tuple().unwrap();
-        assert_eq!(name.name, String::default());
+        // //get all components as vector
+        // let comps = entman.get_components_dyn_ref(ent1).unwrap();
+        // let (loc, name): (LocationComponent, NameComponent) = comps.into();
+        // assert_eq!(name.name, String::default());
         //check in reverse
-        let (name, loc): (NameComponent, LocationComponent) = comps.into_tuple().unwrap();
-        assert_eq!(name.name, String::default());
-        print!("Hello");
+        // let (name, loc): (&mut NameComponent, &mut LocationComponent) = comps.into_tuple().unwrap();
+       
+        // assert_eq!(name.name, String::default());
+        // print!("Hello");
     }
 }
