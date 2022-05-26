@@ -7,11 +7,53 @@ use crate::map::Map;
 
 use super::anyhow::{anyhow, Result};
 use super::*;
+///QueryResult holds a map of entities (ids) and their corrosponding components that match the original query
+pub struct QueryResult<'a, Q: QueryTy> {
+    query: std::marker::PhantomData<Q>,
+    matches: BTreeMap<Id, Vec<&'a dyn ComponentTy>>,
+}
+impl<'a, Q: QueryTy> QueryResult<'a, Q> {
+    pub fn new(
+        ids: impl IntoIterator<Item = Id>,
+        comps: impl IntoIterator<Item = Vec<&'a dyn ComponentTy>>,
+    ) -> Self {
+        let mut matches = BTreeMap::new();
+        for (id, comp) in ids.into_iter().zip(comps) {
+            matches.insert(id, comp);
+        }
+        QueryResult {
+            query: PhantomData,
+            matches,
+        }
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (Id, &[&dyn ComponentTy])> {
+        self.matches
+            .iter()
+            .map(|(id, comps)| (*id, comps.as_slice()))
+    }
+    pub fn get_component<'b, T: ComponentTy>(&'b self, ent: Id) -> Result<&'b T> {
+        if !Q::contains::<T>() {
+            return Err(anyhow!(
+                "Tried to get component of type {} but query doesn't contain it",
+                T::get_name()
+            ));
+        }
+        let comps = self.matches.get(&ent).unwrap();
+        let comp = comps
+            .iter()
+            .find(|c| c.get_component_type_id() == T::get_type_id())
+            .unwrap();
+        comp.downcast_ref()
+            .ok_or(anyhow!("Could not downcast component"))
+    }
+}
 ///The trait representing queryable types
 pub trait QueryTy {
     fn generate_sig() -> Signature;
     fn contains<T: ComponentTy>() -> bool;
-    fn from_dyn_vec(vec:Vec<&dyn ComponentTy>)->Result<Self>;
+    // fn from_dyn_vec(vec: Vec<&dyn ComponentTy>) -> Result<Self>
+    // where
+    //     Self: std::marker::Sized;
 }
 //implement QueryTy for all T that implement TypeIdTy and are ComponentTy
 impl<'a, T: TypeIdTy + ComponentTy> QueryTy for T {
@@ -21,12 +63,10 @@ impl<'a, T: TypeIdTy + ComponentTy> QueryTy for T {
     fn contains<Q: ComponentTy>() -> bool {
         <Q as TypeIdTy>::get_type_id() == <T as TypeIdTy>::get_type_id()
     }
-    fn from_dyn_vec(vec:Vec<&dyn ComponentTy>)->Result<Self>{
-        
-    }
+    // fn from_dyn_vec(vec: Vec<&dyn ComponentTy>) -> Result<Self> {
+    //     todo!()
+    // }
 }
-
-//impl clone
 
 nvproc::generate_query_ty_tuple_impls!();
 
@@ -93,7 +133,6 @@ impl<'em, T: QueryTy> Query<'em, T, NullPredicate<T>> {
         }
     }
 }
-struct ConstAssert<const Assert: bool> {}
 
 ///A query fetch allows statically known access to the components of an entity (hopefully).
 /// It essentially a wrapper over an Entity, but allows direct access to the components since
@@ -124,24 +163,6 @@ impl<'a, T: QueryTy> QueryFetch<'a, T> {
     }
 }
 
-///[QueryResult] contains the matching entities and the components of the matching entities corrosponding to the query.
-/// The 'qr lifetime represents how long we borrow the components.
-pub struct QueryResult<'qr, T: QueryTy> {
-    matches: BTreeMap<Id, Vec<&'qr T>>,
-}
-impl<'qr, T: QueryTy> QueryResult<'qr, T> {
-    pub fn new(
-        entities: impl IntoIterator<Item = Id>,
-        components: impl IntoIterator<Item = Vec<&'qr T>>,
-    ) -> Self {
-        let mut matches = BTreeMap::<Id, Vec<&T>>::new();
-        for (entity, comp) in entities.into_iter().zip(components.into_iter()) {
-            matches.insert(entity, comp);
-        }
-
-        QueryResult { matches }
-    }
-}
 macro_rules! into_tuple {
     ($entman:expr, $ent:expr, $($type:ident),*) => {
         ($($entman.get_component_ref::<$type>($ent).unwrap()),*)
@@ -152,7 +173,7 @@ macro_rules! into_tuple {
 pub struct SystemTy {}
 #[nvproc::query_predicate]
 fn bob_predicate(f: QueryFetch<NameComponent>) -> bool {
-    name_component.component.name == "Bob"
+    name_component.name == "Bob"
 }
 
 #[cfg(test)]
@@ -210,6 +231,8 @@ mod test_query {
         //test null predicate
         let q2 = Query::<NameComponent>::new();
         let qres2 = entman.query(&q2);
+        let name = qres2.get_component::<NameComponent>(ent1).unwrap();
+        assert_eq!(name.name, "Bob");
 
         //test multiple components
         let q3 = Query::<(NameComponent, StringFieldComponent)>::new();
@@ -222,22 +245,10 @@ mod test_query {
                 value: "Bob".to_string(),
             },
         );
-    }
-    #[test]
-    fn test_into_tuple() {
-        let mut entman = Entman::new();
-        let ent1 = entman.add_entity();
-        //add two components to ent1
-        entman.add_component_default::<NameComponent>(ent1);
-        entman.add_component_default::<LocationComponent>(ent1);
-        // //get all components as vector
-        // let comps = entman.get_components_dyn_ref(ent1).unwrap();
-        // let (loc, name): (LocationComponent, NameComponent) = comps.into();
-        // assert_eq!(name.name, String::default());
-        //check in reverse
-        // let (name, loc): (&mut NameComponent, &mut LocationComponent) = comps.into_tuple().unwrap();
-       
-        // assert_eq!(name.name, String::default());
-        // print!("Hello");
+        let qres3 = entman.query(&q3);
+        let name = qres3.get_component::<NameComponent>(ent1).unwrap();
+        assert_eq!(name.name, "Bob");
+        let field = qres3.get_component::<StringFieldComponent>(ent1).unwrap();
+        assert_eq!(field.name, "Name");
     }
 }

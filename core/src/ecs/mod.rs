@@ -333,7 +333,6 @@ impl dyn ComponentTy {
         let any: &dyn Any = self;
         any.downcast_ref::<T>()
     }
-
 }
 impl<T: ComponentTyReqs> CommonComponentStoreTy for CommonComponentStore<T> {
     fn get_type_id(&self) -> TypeId {
@@ -1002,7 +1001,7 @@ impl Entman {
     pub fn query<'a, Q: QueryTy, P: PredicateTy<'a, Q>>(
         &'a self,
         query: &ecs::query::Query<'a, Q, P>,
-    ) -> QueryResult<Q> {
+    ) -> QueryResult<'a, Q> {
         let sig = Q::generate_sig();
         //iterate over all entities, and check if they match the signature of the query
         let mut ids = Vec::new();
@@ -1015,15 +1014,15 @@ impl Entman {
                 if query.predicate().check(qf) {
                     ids.push(*id);
                 }
+                let mut c = Vec::new();
                 for tid in &sig {
                     let comps = self.storage.get_component_dyn_ref(*tid, *id).unwrap();
-                    components.push(comps);
+                    c.push(comps);
                 }
+                components.push(c);
             }
         }
-        // let qr=QueryResult::<Q>::new(ids,Q::from_vec(components).into_iter());
-        // qr
-        todo!()
+        QueryResult::<Q>::new(ids, components)
     }
 }
 
