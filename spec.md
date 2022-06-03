@@ -31,6 +31,6 @@ The basic flow of usage is the user creates entities (characters, locations, etc
 
 
 ## Design
-The critical design decision of Novella is running the kernel (the core of the program), as a server, and any number of GUI frontends as clients. The kernel is responsible for maintaining data, any non-transient state and the quintessential logic of the program, while the frontends are responsible for rendering the data and providing user interaction. Currently, the plan is to communicate between the two using Google's Protocol Buffers and gRPC. 
+The critical design decision of Novella is running the kernel (the core of the program), as a server, and any number of GUI frontends as clients. The kernel is responsible for maintaining data, any non-transient state and the quintessential logic of the program, while the frontends are responsible for rendering the data and providing user interaction. The method of communication between the two is still being considered.
 ### Kernel
 The kernel is primarily written in Rust. As Rust is not an OOP language in the canonical sense, normal inheritence models are not applicable. Instead, it is primarily organized around a data-oriented ECS (Entity-Component-Sysem) model. Similar to how this system might work in a video game, an entity holds a variable number of components which define the things that entity might be able. 
