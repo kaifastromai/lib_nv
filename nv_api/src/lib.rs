@@ -39,7 +39,7 @@ impl<'a> ContextInternal<'a> {
     pub fn get_field_component_with_id(&self, field_id: ffi::Id) -> *mut ffi::StringFieldComponent {
         let field_comp = self
             .mir
-            .get_component_with_id::<StringFieldComponent>(field_id.into())
+            .get_component_ref::<StringFieldComponent>(field_id.into())
             .unwrap();
         //convert to raw pointer
         let field_comp_ptr = std::ptr::addr_of!(field_comp.component);
@@ -53,7 +53,7 @@ impl<'a> ContextInternal<'a> {
     pub fn get_name_component_with_id(&self, name_id: ffi::Id) -> *mut ffi::NameComponent {
         let name_comp = self
             .mir
-            .get_component_with_id::<NameComponent>(name_id.into())
+            .get_component_by_id_ref::<NameComponent>(name_id.into())
             .unwrap();
         //convert to raw pointer
         let name_comp_ptr = std::ptr::addr_of!(name_comp.component);

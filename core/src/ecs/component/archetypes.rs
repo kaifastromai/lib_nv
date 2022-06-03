@@ -57,7 +57,7 @@ impl ArchetypeDescriptor {
     }
 
     pub fn with_component<T: ComponentTypeIdTy>(mut self) -> Self {
-        self.signature.add(TypeId::of::<T>());
+        self.signature.insert(TypeId::of::<T>());
         self
     }
     pub fn take_components(self) -> Vec<EComponentGraphTypes> {
@@ -115,18 +115,18 @@ impl ArchetypeTy for CharacterArchetype {
                     value: 0.0
                 },
                 RelationshipComponent {
-                    relationship: Relationship::new(
-                        "Mother".to_string(),
-                        ERelationship::parent_child(Parent::Mother, Child::Son),
-                        (0, 0)
-                    )
-                },
-                RelationshipComponent {
-                    relationship: Relationship::new(
-                        "Father".to_string(),
-                        ERelationship::parent_child(Parent::Father, Child::Son),
-                        (0, 0)
-                    )
+                    relationships: vec![
+                        Relationship::new(
+                            "Mother".to_string(),
+                            ERelationship::parent_child(Parent::Mother, Child::Son),
+                            (0, 0)
+                        ),
+                        Relationship::new(
+                            "Father".to_string(),
+                            ERelationship::parent_child(Parent::Father, Child::Son),
+                            (0, 0)
+                        )
+                    ]
                 },
                 StringFieldComponent {
                     name: "Description".to_string(),

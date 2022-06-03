@@ -86,18 +86,17 @@ impl<'a> Mir<'a> {
     pub fn get_all_living_entities(&self) -> Vec<Id> {
         self.em.get_all_living_entities()
     }
-    pub fn get_entity_component_by_id<T: ComponentTyReqs>(
+    pub fn get_component_ref<T: ComponentTyReqs>(
         &self,
         entity: Id,
-        component_id: ComponentId,
     ) -> Result<&crate::ecs::Component<T>> {
-        self.em.get_entity_component_by_id(entity, component_id)
+        self.em.get_component_ref(entity)
     }
-    pub fn get_component_with_id<T: ComponentTyReqs>(
+    pub fn get_component_by_id_ref<T: ComponentTyReqs>(
         &self,
-        component_id: ComponentId,
+        id: ComponentId,
     ) -> Result<&crate::ecs::Component<T>> {
-        self.em.get_component_with_id(component_id)
+        self.em.get_component_by_id_ref(id)
     }
     pub fn load_from_file(path: &str) -> Result<Mir> {
         let mut br = BufReader::new(File::open(path)?);
@@ -128,5 +127,4 @@ mod test_mir {
             .0;
         assert_eq!(mir2.proj.project_meta_data.name, "test_name");
     }
-   
 }

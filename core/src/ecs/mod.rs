@@ -1,7 +1,9 @@
 pub mod component;
 pub mod prelude;
+pub mod query;
 mod tests;
 use self::component::archetypes::{Archetype, ArchetypeTy};
+use crate::ecs::query::*;
 
 use super::*;
 use crate::ecs::component::*;
@@ -56,19 +58,19 @@ impl From<ComponentId> for u128 {
         id.id
     }
 }
-//A component type. It's id corrosponds to the entity it belongs to.
-pub trait ComponentTy: 'static {
-    fn get_type_id(&self) -> TypeId {
+//A component type.
+pub trait ComponentTy: Any {
+    fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
-    fn get_type_name(&self) -> &'static str {
+    fn get_component_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
     fn get_component_name(&self) -> &'static str;
     //Prepare this component to be used by a new entity
     fn clean(&mut self);
-    fn get_any(&self) -> &dyn Any;
-    fn get_any_mut(&mut self) -> &mut dyn Any;
+    fn get_any(&self) -> &dyn ComponentTy;
+    fn get_any_mut(&mut self) -> &mut dyn ComponentTy;
     fn get_component_type(&self) -> EComponentTypes;
     fn serialize(&self) -> Result<Vec<u8>> {
         todo!()
@@ -76,28 +78,28 @@ pub trait ComponentTy: 'static {
 }
 
 pub trait ComponentTyReqs: 'static + Clone + ComponentTy {
-    fn get_type_id() -> TypeId {
+    fn get_req_component_type_id() -> TypeId {
         TypeId::of::<Self>()
     }
-    fn get_type_name() -> &'static str {
+    fn get_req_type_name() -> &'static str {
         std::any::type_name::<Self>()
     }
 }
 impl<T: ComponentTy + Clone> ComponentTyReqs for T {}
 impl ComponentTy for () {
-    fn get_type_id(&self) -> TypeId {
+    fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<()>()
     }
-    fn get_type_name(&self) -> &'static str {
+    fn get_component_type_name(&self) -> &'static str {
         std::any::type_name::<()>()
     }
     fn get_component_name(&self) -> &'static str {
         "()"
     }
-    fn get_any(&self) -> &dyn Any {
+    fn get_any(&self) -> &dyn ComponentTy {
         self
     }
-    fn get_any_mut(&mut self) -> &mut dyn Any {
+    fn get_any_mut(&mut self) -> &mut dyn ComponentTy {
         self
     }
 
@@ -106,17 +108,41 @@ impl ComponentTy for () {
         unimplemented!()
     }
 }
+pub trait IntoComponentRef<T: ComponentTy> {
+    fn into_ref(&self) -> &T;
+}
+impl<T: ComponentTy> IntoComponentRef<T> for &dyn ComponentTy {
+    fn into_ref(&self) -> &T {
+        let any: &dyn Any = self.get_any();
+        any.downcast_ref::<T>().unwrap()
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 #[nvproc::bincode_derive]
 #[nvproc::serde_derive]
+///The signature of an Entity. An entity can only have one component of each type.
+/// A [Signature] is essentially an ordered set of TypeIds
+
 pub struct Signature(Vec<TypeId>);
 impl Signature {
     pub fn new() -> Self {
         Signature(Vec::new())
     }
-    pub fn add(&mut self, type_id: TypeId) {
-        self.0.push(type_id);
+    ///Inserts the type id into the signature. If the type id is already in the signature, it is ignored.
+    pub fn insert(&mut self, type_id: TypeId) {
+        if !self.contains(type_id) {
+            self.0.push(type_id);
+        }
+    }
+    ///Inserts the type id into the signature, but returns an error if the type id is already in the signature.
+    pub fn insert_checked(&mut self, type_id: TypeId) -> Result<()> {
+        if self.0.contains(&type_id) {
+            Err(anyhow!("TypeId already in signature"))
+        } else {
+            self.0.push(type_id);
+            Ok(())
+        }
     }
     pub fn get_type_ids(&self) -> &Vec<TypeId> {
         &self.0
@@ -137,10 +163,52 @@ impl Signature {
     pub fn contains(&self, type_id: TypeId) -> bool {
         self.0.contains(&type_id)
     }
+    pub fn merge(&mut self, other: &Signature) {
+        self.0.extend(other.0.iter().cloned());
+    }
+    ///Returns a [Signature] with no duplicate components
+    pub fn get_singular_signature(&self) -> Signature {
+        let mut sig = Signature::new();
+        for type_id in self.0.iter() {
+            if !sig.contains(*type_id) {
+                sig.insert(*type_id);
+            }
+        }
+        sig
+    }
 }
 impl From<Vec<TypeId>> for Signature {
     fn from(vec: Vec<TypeId>) -> Self {
         Signature(vec)
+    }
+}
+impl From<TypeId> for Signature {
+    fn from(type_id: TypeId) -> Self {
+        Signature(vec![type_id])
+    }
+}
+impl From<Vec<Signature>> for Signature {
+    fn from(vec: Vec<Signature>) -> Self {
+        let mut sig = Signature::new();
+        for s in vec {
+            sig.merge(&s);
+        }
+        sig
+    }
+}
+//impl into iterator for signature
+impl IntoIterator for Signature {
+    type Item = TypeId;
+    type IntoIter = std::vec::IntoIter<TypeId>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+impl<'a> IntoIterator for &'a Signature {
+    type Item = &'a TypeId;
+    type IntoIter = std::slice::Iter<'a, TypeId>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
@@ -149,21 +217,21 @@ impl From<Vec<TypeId>> for Signature {
 pub struct Entity {
     id: Id,
     is_alive: bool,
-    components: Signature,
+    sig: Signature,
 }
 impl Entity {
     pub fn new(id: Id) -> Self {
         Self {
             id,
             is_alive: true,
-            components: Signature::new(),
+            sig: Signature::new(),
         }
     }
     pub fn from_sig(id: Id, sig: Signature) -> Self {
         Self {
             id,
             is_alive: true,
-            components: sig,
+            sig,
         }
     }
     pub fn is_valid(&self) -> bool {
@@ -174,24 +242,24 @@ impl Entity {
     }
     pub fn add_component<T: ComponentTyReqs>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
-        self.components.add(tid);
+        self.sig.insert(tid);
 
         Ok(())
     }
     pub fn remove_component<T: ComponentTyReqs>(&mut self) -> Result<()> {
         let tid = TypeId::of::<T>();
-        self.components.remove_component(tid)?;
+        self.sig.remove_component(tid)?;
         Ok(())
     }
     pub fn has_component<T: ComponentTyReqs>(&self) -> bool {
         let tid = TypeId::of::<T>();
-        self.components.contains(tid)
+        self.sig.contains(tid)
     }
     pub fn get_signature(&self) -> Signature {
-        self.components.clone()
+        self.sig.clone()
     }
     pub fn get_signature_ref(&self) -> &Signature {
-        &self.components
+        &self.sig
     }
 }
 
@@ -232,26 +300,35 @@ pub trait CommonComponentStoreTy: Any {
     fn get_any_mut(&mut self) -> &mut dyn Any;
     fn insert_dyn(&mut self, component: DynamicComponent) -> Result<()>;
     fn remove_entity_components(&mut self, entity: Id) -> Result<()>;
-    fn get_owned_entity_components(&self, entity: Id) -> Result<Vec<DynamicComponent>>;
+    fn get_dynamic_component(&self, entity: Id) -> Result<DynamicComponent>;
+    ///Returns the component of a given entity as &dyn ComponentTy
+    fn get_component_dyn_ref(&self, entity: Id) -> Result<&dyn ComponentTy>;
 }
 
 impl dyn CommonComponentStoreTy {
     fn get_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-    fn into_store<T: ComponentTyReqs>(&self) -> &CommonComponentStore<T> {
+    fn into_store<T: ComponentTyReqs>(&self) -> Result<&CommonComponentStore<T>> {
         //convert to Any
         //convert to CommonComponentStore
         let any: &CommonComponentStore<T> = self
             .downcast_ref()
-            .expect("Could not downcast to CommonComponentStore");
-        any
+            .ok_or(anyhow!("Could not downcast to CommonComponentStore"))?;
+        Ok(any)
     }
     fn into_store_mut<T: ComponentTyReqs>(&mut self) -> &mut CommonComponentStore<T> {
         self.get_any_mut()
             .downcast_mut::<CommonComponentStore<T>>()
             .unwrap()
     }
+    fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        let any: &dyn Any = self;
+        any.downcast_ref::<T>()
+    }
+}
+
+impl dyn ComponentTy {
     fn downcast_ref<T: Any>(&self) -> Option<&T> {
         let any: &dyn Any = self;
         any.downcast_ref::<T>()
@@ -281,8 +358,11 @@ impl<T: ComponentTyReqs> CommonComponentStoreTy for CommonComponentStore<T> {
     fn remove_entity_components(&mut self, entity: Id) -> Result<()> {
         self.remove_entity_components_internal(entity)
     }
-    fn get_owned_entity_components(&self, entity: Id) -> Result<Vec<DynamicComponent>> {
+    fn get_dynamic_component(&self, entity: Id) -> Result<DynamicComponent> {
         self.get_owned_entity_components_internal(entity)
+    }
+    fn get_component_dyn_ref(&self, entity: Id) -> Result<&dyn ComponentTy> {
+        self.get_entity_components_as_dyn_ref_internal(entity)
     }
 }
 
@@ -396,10 +476,10 @@ impl<T: ComponentTyReqs + common::exports::serde::Serialize> ComponentTy for Com
     fn get_component_name(&self) -> &'static str {
         self.get_inner().get_component_name()
     }
-    fn get_any(&self) -> &dyn Any {
+    fn get_any(&self) -> &dyn ComponentTy {
         self
     }
-    fn get_any_mut(&mut self) -> &mut dyn Any {
+    fn get_any_mut(&mut self) -> &mut dyn ComponentTy {
         self
     }
 
@@ -466,27 +546,16 @@ pub struct CommonComponentStore<T: ComponentTyReqs> {
     type_id: TypeId,
     type_name: String,
     //the components of this store, hashed by the owning entity id
-    components: HashMap<EntityId, HashMap<ComponentId, Component<T>>>,
+    //each entity can only have one component of this type, so one entry in common store per entity
+    components: HashMap<EntityId, Component<T>>,
 }
 impl<T: ComponentTyReqs + Default> CommonComponentStore<T> {
-    pub fn insert_default(&mut self, owning_entity: Id) -> Result<ComponentId> {
-        //first check if there is an orphan component
-        let component_id;
-
-        if self.components.contains_key(&owning_entity) {
-            let hshmp = self.components.get_mut(&owning_entity).unwrap();
-            let comp = Component::<T>::new(owning_entity);
-            component_id = comp.id.into();
-            hshmp.insert(comp.get_id().into(), comp);
-        } else {
-            let mut hshmp = HashMap::new();
-            let component = Component::<T>::new(owning_entity);
-            component_id = component.id.into();
-            hshmp.insert(component.get_id().into(), component);
-            self.components.insert(owning_entity, hshmp);
+    pub fn insert_default(&mut self, owning_entity: Id) -> Result<()> {
+        let component = Component::new(owning_entity);
+        match self.components.insert(owning_entity, component) {
+            Some(_) => Err(anyhow! {"Entity already has component of type {}", self.type_name}),
+            None => Ok(()),
         }
-
-        Ok(component_id)
     }
 }
 impl<T: ComponentTyReqs> CommonComponentStore<T> {
@@ -501,40 +570,39 @@ impl<T: ComponentTyReqs> CommonComponentStore<T> {
         self.type_id
     }
 
-    pub fn insert(&mut self, owning_entity: Id, component: T) -> Result<ComponentId> {
-        let id;
-
-        if self.components.contains_key(&owning_entity) {
-            let hshmp = self.components.get_mut(&owning_entity).unwrap();
-            let comp = Component::<T>::from(owning_entity, component);
-            id = comp.get_id();
-            hshmp.insert(comp.get_id(), comp);
-        } else {
-            let mut hshmp = HashMap::new();
-            let component = Component::<T>::from(owning_entity, component);
-            id = component.get_id();
-            hshmp.insert(component.get_id(), component);
-            self.components.insert(owning_entity, hshmp);
+    pub fn insert(&mut self, owning_entity: Id, component: T) -> Result<()> {
+        match self.components.get(&owning_entity) {
+            Some(_) => Err(anyhow! {"Entity already has component of type {}", self.type_name}),
+            None => {
+                self.components
+                    .insert(owning_entity, Component::from(owning_entity, component));
+                Ok(())
+            }
         }
-
-        Ok(id)
     }
     pub fn insert_dynamic(&mut self, component: DynamicComponent) -> Result<()> {
-        let id;
-        let owning_entity = component.owning_entity.unwrap();
-        if self.components.contains_key(&owning_entity) {
-            let hshmp = self.components.get_mut(&owning_entity).unwrap();
-            let comp = Component::<T>::from_dynamic(component);
-            id = comp.get_id();
-            hshmp.insert(comp.get_id(), comp);
-        } else {
-            let mut hshmp = HashMap::new();
-            let component = Component::<T>::from_dynamic(component);
-            id = component.get_id();
-            hshmp.insert(component.get_id(), component);
-            self.components.insert(owning_entity, hshmp);
+        match self.components.get(&component.owning_entity.unwrap()) {
+            Some(_) => Err(anyhow! {"Entity already has component of type {}", self.type_name}),
+            None => {
+                self.components.insert(
+                    component.owning_entity.unwrap(),
+                    Component::from_dynamic(component),
+                );
+                Ok(())
+            }
         }
-        Ok(())
+    }
+    pub fn get_component_by_id_ref(&self, id: ComponentId) -> Result<&Component<T>> {
+        //loop through components and find the one that matches the id
+        let res = self
+            .components
+            .iter()
+            .map(|c| c.1)
+            .find(|c| c.id == id)
+            .ok_or(anyhow! {
+                "Component with id {} not found", id
+            });
+        res
     }
     //Returns the type of this common storage
     pub fn get_common_type(&self) -> Result<EComponentTypes> {
@@ -554,28 +622,25 @@ impl<T: ComponentTyReqs> CommonComponentStore<T> {
         todo!()
     }
 
-    //Actually deletes the component memory from the store
-    pub fn remove(&mut self, owning_entity: Id, component_id: ComponentId) -> Result<()> {
-        self.components
-            .get_mut(&owning_entity)
-            .unwrap()
-            .remove(&component_id);
-        Ok(())
-    }
-    pub fn remove_entity_components_internal(&mut self, owning_entity: Id) -> Result<()> {
+    //Delete component of entity from this store
+    pub fn remove(&mut self, owning_entity: Id) -> Result<()> {
         self.components.remove(&owning_entity);
         Ok(())
     }
-    pub fn get_owned_entity_components_internal(
+    fn remove_entity_components_internal(&mut self, owning_entity: Id) -> Result<()> {
+        self.components.remove(&owning_entity);
+        Ok(())
+    }
+    fn get_owned_entity_components_internal(&self, owning_entity: Id) -> Result<DynamicComponent> {
+        let comp = self.components.get(&owning_entity).unwrap();
+        Ok(DynamicComponent::from_component(comp.clone()))
+    }
+    fn get_entity_components_as_dyn_ref_internal(
         &self,
         owning_entity: Id,
-    ) -> Result<Vec<DynamicComponent>> {
-        let mut res = Vec::new();
-        let hshmp = self.components.get(&owning_entity).unwrap();
-        for (_, comp) in hshmp {
-            res.push(DynamicComponent::from_component(comp.clone()));
-        }
-        Ok(res)
+    ) -> Result<&dyn ComponentTy> {
+        let comp = self.components.get(&owning_entity).unwrap();
+        Ok(comp.component.get_any() as &dyn ComponentTy)
     }
 }
 impl<'de> serde::Deserialize<'de> for Box<dyn CommonComponentStoreTy> {
@@ -628,9 +693,8 @@ impl Storage {
     pub fn insert_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
         &mut self,
         entity: Id,
-    ) -> Result<ComponentId> {
+    ) -> Result<()> {
         let id = TypeId::of::<T>();
-        let component_id;
         match self.bins.contains_key(&id) {
             true => {
                 let mut store = self.bins.get_mut(&id).unwrap();
@@ -640,15 +704,15 @@ impl Storage {
                     .get_any_mut()
                     .downcast_mut::<CommonComponentStore<T>>()
                     .unwrap();
-                component_id = store.insert_default(entity);
+                store.insert_default(entity);
             }
             false => {
                 let mut store = CommonComponentStore::<T>::new();
-                component_id = store.insert_default(entity);
+                store.insert_default(entity);
                 self.bins.insert(id, Box::new(store));
             }
         }
-        component_id
+        Ok(())
     }
     pub fn insert_dynamic(&mut self, component: DynamicComponent) -> Result<()> {
         let tid = component.get_type_id();
@@ -660,9 +724,9 @@ impl Storage {
         &mut self,
         entity: Id,
         component: T,
-    ) -> Result<ComponentId> {
+    ) -> Result<()> {
         let id = TypeId::of::<T>();
-        let component_id;
+
         match self.bins.contains_key(&id) {
             true => {
                 let mut store = self.bins.get_mut(&id).unwrap();
@@ -670,89 +734,30 @@ impl Storage {
                 let store = (store.as_mut().get_any_mut())
                     .downcast_mut::<CommonComponentStore<T>>()
                     .unwrap();
-                component_id = store.insert(entity, component);
+                store.insert(entity, component);
             }
             false => {
                 let mut store = CommonComponentStore::<T>::new();
-                component_id = store.insert(entity, component);
+                store.insert(entity, component);
                 self.bins.insert(id, Box::new(store));
             }
         }
-
-        component_id
+        Ok(())
     }
-    pub fn get_entity_component_by_id<T: ComponentTyReqs + Clone>(
-        &self,
-        entity: Id,
-        component_id: ComponentId,
-    ) -> Result<&Component<T>> {
-        let id = TypeId::of::<T>();
-        match self.bins.contains_key(&id) {
-            true => {
-                let store = self.bins.get(&id).unwrap();
-                //downcast to the correct type
-                let store: &CommonComponentStore<T> = store.into_store();
-
-                match store.components.get(&entity) {
-                    Some(component) => component.get(&component_id).ok_or(anyhow!(
-                        "Component of type {} with id {:x} not found",
-                        type_name_any::<T>(),
-                        u128::from(component_id)
-                    )),
-                    None => Err(anyhow!(
-                        "Entity does not have component of type {}",
-                        std::any::type_name::<T>()
-                    )),
-                }
-            }
-            false => Err(anyhow!(
-                "No component store of type {} has yet been created",
-                std::any::type_name::<T>()
-            )),
-        }
-    }
-    pub fn get_component_with_id<T: ComponentTyReqs + Clone>(
-        &self,
-        component_id: ComponentId,
-    ) -> Result<&Component<T>> {
-        let id = TypeId::of::<T>();
-        match self.bins.contains_key(&id) {
-            true => {
-                let store = self.bins.get(&id).unwrap();
-                //downcast to the correct type
-                let store = store.into_store();
-                //iterate over all components and return the first one that matches
-                for (_, component) in store.components.iter() {
-                    if component.contains_key(&component_id) {
-                        return Ok(component.get(&component_id).unwrap());
-                    }
-                }
-                Err(anyhow!("Component with id {} not found", component_id))
-            }
-            false => Err(anyhow!(
-                "No component store of type {} has yet been created",
-                std::any::type_name::<T>()
-            )),
-        }
-    }
-    //Returns a list of all components of type T for the given entity
-    pub fn get_components_of_type<T: ComponentTyReqs>(
-        &self,
+    //Get the component of the given type for the given entity
+    pub fn get_component_ref<'c, T: ComponentTyReqs>(
+        &'c self,
         entity: EntityId,
-    ) -> Result<Vec<&Component<T>>> {
+    ) -> Result<&'c Component<T>> {
         match self.bins.contains_key(&TypeId::of::<T>()) {
             true => {
-                let mut res = Vec::<&Component<T>>::new();
-
-                //iterate through all component stores, and get the components and add to the list
-                for (_, store) in self.bins.iter() {
-                    let store: &CommonComponentStore<T> = store.into_store();
-
-                    if let Some(component) = store.components.get(&entity) {
-                        res.append(&mut component.values().collect::<Vec<&Component<T>>>());
-                    }
+                let store = self.bins.get(&TypeId::of::<T>()).unwrap();
+                let store = store.into_store().unwrap();
+                let comp = store.components.get(&entity);
+                match comp {
+                    Some(c) => Ok(c),
+                    None => Err(anyhow! {"Entity dooes not have component"}),
                 }
-                Ok(res)
             }
             false => Err(anyhow!(
                 "No component store of type {} has yet been created",
@@ -760,11 +765,23 @@ impl Storage {
             )),
         }
     }
+    ///Returns a list of all components of type id [type_id] for the given [entity]
+    fn get_component_dyn_ref(&self, type_id: TypeId, entity: Id) -> Result<&dyn ComponentTy> {
+        match self.bins.contains_key(&type_id) {
+            true => {
+                let store = self.bins.get(&type_id).unwrap();
+                store.get_component_dyn_ref(entity)
+            }
+            false => Err(anyhow!(
+                "No component store of type {} has yet been created",
+                type_id.get_name_ref()
+            )),
+        }
+    }
 
-    pub fn get_component_mut_by_id<T: ComponentTyReqs>(
+    pub fn get_component_mut<T: ComponentTyReqs>(
         &mut self,
         entity: Id,
-        component_id: ComponentId,
     ) -> Result<&mut Component<T>> {
         let id = TypeId::of::<T>();
         match self.bins.contains_key(&id) {
@@ -773,9 +790,7 @@ impl Storage {
                 //downcast to the correct type
                 let store = store.into_store_mut::<T>();
                 match store.components.get_mut(&entity) {
-                    Some(component) => component
-                        .get_mut(&component_id)
-                        .ok_or(anyhow!("Component with id {} not found", component_id)),
+                    Some(component) => Ok(component),
                     None => Err(anyhow!(
                         "Entity does not have component of type {}",
                         std::any::type_name::<T>()
@@ -788,14 +803,39 @@ impl Storage {
             )),
         }
     }
+    pub fn get_component_by_id_ref<T: ComponentTyReqs>(
+        &self,
+        id: ComponentId,
+    ) -> Result<&Component<T>> {
+        match self.bins.get(&T::get_type_id()) {
+            Some(s) => {
+                let store = s.into_store()?;
+                store.get_component_by_id_ref(id)
+            }
+            None => Err(
+                anyhow! { "No component store of type {} has yet been created",
+                    std::any::type_name::<T>()
+                },
+            ),
+        }
+    }
+    ///Get owned clones of all the [Component]'s owned by a given entity
     pub fn get_entity_owned_components(&self, entity: Id) -> Result<Vec<DynamicComponent>> {
         let mut comps: Vec<DynamicComponent> = Vec::new();
         for (_, store) in self.bins.iter() {
-            let mut cs = store.get_owned_entity_components(entity)?;
-            comps.append(&mut cs);
+            let mut cs = store.get_dynamic_component(entity)?;
+            comps.push(cs)
         }
         Ok(comps)
     }
+    pub fn get_components_dyn_ref(&self, entity: Id) -> Result<Vec<&dyn ComponentTy>> {
+        let mut res = Vec::new();
+        for (_, b) in self.bins.iter() {
+            res.push(b.get_component_dyn_ref(entity)?)
+        }
+        Ok(res)
+    }
+
     ///Removes all components associated with the given entity
     pub fn remove_entity_components(&mut self, entity: Id) {
         for (_, store) in self.bins.iter_mut() {
@@ -864,7 +904,7 @@ impl Entman {
 
         ent
     }
-    //Removes the entity from the entity manager, and marks all it's components as orphaned.
+    //Removes the entity from the entity manager
     pub fn remove_entity(&mut self, entity: Id) {
         self.entities.remove(&entity);
         self.storage.remove_entity_components(entity);
@@ -874,21 +914,22 @@ impl Entman {
         &mut self,
         entity: Id,
         component: T,
-    ) -> Result<ComponentId> {
-        let component_id = self.storage.insert_component::<T>(entity, component);
+    ) -> Result<()> {
+        self.storage.insert_component::<T>(entity, component);
         //add to entity signature
         let ent = self.entities.get_mut(&entity).unwrap();
         ent.add_component::<T>()?;
-        component_id
+        Ok(())
     }
-    //Adds a component to an entity, calling the default "constructor"
-    pub fn add_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
+    ///Adds a component to an entity, calling the default "constructor"
+    pub fn add_component_default<T: ComponentTyReqs + Default + serde::Serialize + Clone>(
         &mut self,
         entity: Id,
-    ) -> Result<ComponentId> {
+    ) -> Result<()> {
         let ent = self.entities.get_mut(&entity).unwrap();
         ent.add_component::<T>()?;
-        self.storage.insert_default::<T>(entity)
+        self.storage.insert_default::<T>(entity)?;
+        Ok(())
     }
     pub fn get_entity_ref(&self, entity: Id) -> Option<EntityRef> {
         Some(EntityRef {
@@ -924,29 +965,7 @@ impl Entman {
             })
             .collect()
     }
-    //Returns the component of type T and id ComponentId for the given entity.
-    pub fn get_entity_component_by_id<T: ComponentTyReqs>(
-        &self,
-        entity: Id,
-        component_id: ComponentId,
-    ) -> Result<&Component<T>> {
-        self.storage
-            .get_entity_component_by_id(entity, component_id)
-    }
-    //Returns the component of type T and id ComponentId.
-    pub fn get_component_with_id<T: ComponentTyReqs>(
-        &self,
-        id: ComponentId,
-    ) -> Result<&Component<T>> {
-        self.storage.get_component_with_id(id)
-    }
-    //Get's all components of a common type beling to an entity.
-    pub fn get_components_of_type<T: ComponentTyReqs>(
-        &self,
-        entity: Id,
-    ) -> Result<Vec<&Component<T>>> {
-        self.storage.get_components_of_type::<T>(entity)
-    }
+
     pub fn get_entity_owned(&self, entity: Id) -> Result<EntityOwned> {
         let sig = self.get_entity(entity).unwrap().get_signature();
         let components = self.storage.get_entity_owned_components(entity)?;
@@ -955,6 +974,55 @@ impl Entman {
             signature: sig,
             components,
         })
+    }
+    pub fn get_component_ref<'c, T: ComponentTyReqs>(
+        &'c self,
+        entity: Id,
+    ) -> Result<&'c Component<T>> {
+        self.storage.get_component_ref::<T>(entity)
+    }
+    pub fn get_component_by_id_ref<T: ComponentTyReqs>(
+        &self,
+        id: ComponentId,
+    ) -> Result<&Component<T>> {
+        self.storage.get_component_by_id_ref(id)
+    }
+    pub fn get_component_mut<T: ComponentTyReqs>(
+        &mut self,
+        entity: Id,
+    ) -> Result<&mut Component<T>> {
+        self.storage.get_component_mut::<T>(entity)
+    }
+    pub fn get_components_dyn_ref(&self, entity: Id) -> Result<Vec<&dyn ComponentTy>> {
+        self.storage.get_components_dyn_ref(entity)
+    }
+
+    ///Runs the given query, returning a vector of entities that match the query.
+    pub fn query<'a, Q: QueryTy, P: PredicateTy<'a, Q>>(
+        &'a self,
+        query: &ecs::query::Query<'a, Q, P>,
+    ) -> QueryResult<'a, Q> {
+        let sig = Q::generate_sig();
+        //iterate over all entities, and check if they match the signature of the query
+        let mut ids = Vec::new();
+        let mut components = Vec::new();
+        for (id, entity) in self.entities.iter() {
+            if entity.get_signature().get_singular_signature() == sig {
+                let id = id;
+
+                let qf = QueryFetch::new(*id, &self);
+                if query.predicate().check(qf) {
+                    ids.push(*id);
+                }
+                let mut c = Vec::new();
+                for tid in &sig {
+                    let comps = self.storage.get_component_dyn_ref(*tid, *id).unwrap();
+                    c.push(comps);
+                }
+                components.push(c);
+            }
+        }
+        QueryResult::<Q>::new(ids, components)
     }
 }
 

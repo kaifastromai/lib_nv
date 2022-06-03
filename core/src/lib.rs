@@ -2,7 +2,13 @@
 #![allow(dead_code, unused_imports, unused_assignments, warnings)]
 #![feature(generic_arg_infer)]
 #![feature(trait_upcasting)]
-
+#![feature(unboxed_closures, fn_traits)]
+#![feature(generic_const_exprs)]
+#![feature(adt_const_params)]
+#![feature(associated_type_defaults)]
+#![feature(generic_associated_types)]
+#![feature(auto_traits)]
+#![feature(negative_impls)]
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 mod action;
