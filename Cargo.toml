@@ -1,2 +1,2 @@
 [workspace]
-members = ["core", "common", "nvfs", "components_track", "sdsl"]
+members = ["core", "common", "nvfs", "components_track", "sdsl", "server"]
