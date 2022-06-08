@@ -7,15 +7,110 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'novella'",
+            "name": "Debug unit tests in library 'nvcore'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=nvcore"
+                ],
+                "filter": {
+                    "name": "nvcore",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'common'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=common"
+                ],
+                "filter": {
+                    "name": "common",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'components_track'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=components_track"
+                ],
+                "filter": {
+                    "name": "components_track",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'nvfs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=nvfs"
+                ],
+                "filter": {
+                    "name": "nvfs",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'sdsl'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=sdsl"
+                ],
+                "filter": {
+                    "name": "sdsl",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'server'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=novella",
-                    "--package=novella"
+                    "--bin=server",
+                    "--package=server"
                 ],
                 "filter": {
-                    "name": "novella",
+                    "name": "server",
                     "kind": "bin"
                 }
             },
@@ -25,17 +120,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'novella'",
+            "name": "Debug unit tests in executable 'server'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=novella",
-                    "--package=novella"
-                   
+                    "--bin=server",
+                    "--package=server"
                 ],
                 "filter": {
-                    "name": "novella",
+                    "name": "server",
                     "kind": "bin"
                 }
             },
