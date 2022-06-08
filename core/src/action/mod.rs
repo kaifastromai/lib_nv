@@ -29,12 +29,6 @@ pub trait ParamTy: Clone {
 }
 pub struct Param<T: ParamTy>(T);
 
-impl ResrcTy for () {
-    fn get_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
 //A thin wrapper around a resource.
 pub struct Resrc<T>(T);
 impl<T> Resrc<T> {
@@ -47,9 +41,15 @@ impl<T> Resrc<T> {
         Resrc(t)
     }
 }
-impl ResrcTy for Box<dyn ResrcTy> {
+impl<'a> ResrcTy for Box<dyn ResrcTy + 'a> {
     fn get_mut(&mut self) -> &mut dyn Any {
         self.get_mut()
+    }
+}
+
+impl<T: Any + Clone> ResrcTy for T {
+    fn get_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 //impl deref for Resrc<T> that returns the inner type
@@ -67,22 +67,25 @@ pub trait ActionTy {
     fn set_id(&mut self, id: u128);
 }
 
-//An action represents something that induce a change in the current state of the kernel.
-//An action contains two functions, one that executes the action, and optionaly one that undoes the action.
-//Th executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
-//Th undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
+/**An action represents something that induce a change in the current state of the kernel.
+An action contains two functions, one that executes the action, and optionaly one that undoes the action.
+Th executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
+Th undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
+*/
+
 pub struct Action<'a, R: ResrcTy, P: Clone> {
     pub action_id: u128,
     pub param: P,
-    exec: &'a dyn Fn(&mut Mir, P) -> Result<Box<R>>,
-    undo: Option<&'a dyn Fn(&mut Mir, Resrc<&R>) -> Result<()>>,
+    exec: &'a dyn Fn(&mut Mir, P) -> Result<R>,
+    undo: Option<&'a dyn Fn(&mut Mir, Resrc<R>) -> Result<()>>,
     pub is_complete: bool,
 }
+
 impl<'a, R: ResrcTy, P: Clone> Action<'a, R, P> {
     //Create a new action, specifying the function to execute and the function that undoes the action
     pub fn new(
-        exec: &'a impl Fn(&mut Mir, P) -> Result<Box<R>>,
-        undo: &'a impl Fn(&mut Mir, Resrc<&R>) -> Result<()>,
+        exec: &'a impl Fn(&mut Mir, P) -> Result<R>,
+        undo: &'a impl Fn(&mut Mir, Resrc<R>) -> Result<()>,
         param: P,
     ) -> Self {
         Action {
@@ -94,7 +97,7 @@ impl<'a, R: ResrcTy, P: Clone> Action<'a, R, P> {
         }
     }
     //Create a new action, only specifying the function to execute. This action will NOT be undoable
-    pub fn new_pure(exec: &'a impl Fn(&mut Mir, P) -> Result<Box<R>>, param: P) -> Self {
+    pub fn new_pure(exec: &'a impl Fn(&mut Mir, P) -> Result<R>, param: P) -> Self {
         Action {
             is_complete: false,
             exec,
@@ -103,11 +106,11 @@ impl<'a, R: ResrcTy, P: Clone> Action<'a, R, P> {
             action_id: 0,
         }
     }
-    pub fn exec(&mut self, mir: &mut Mir) -> Result<Box<R>> {
+    pub fn exec(&mut self, mir: &mut Mir) -> Result<R> {
         self.is_complete = true;
         (self.exec)(mir, self.param.clone())
     }
-    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&R>) -> Result<()> {
+    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<R>) -> Result<()> {
         if self.is_complete {
             let res = match self.undo {
                 Some(u) => Ok(u),
@@ -126,13 +129,13 @@ impl<'a, R: ResrcTy + Clone + 'static, P: Clone> ActionTy for Action<'a, R, P> {
     fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
         let res = self.exec(mir)?;
         //convert R to Box<dyn ResrcTy>
-        let r = (Box::from(*res) as Box<dyn ResrcTy>);
+        let r = (Box::from(res) as Box<dyn ResrcTy>);
         //convert to to box
         Ok(r)
     }
     fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&mut dyn ResrcTy>) -> Result<()> {
         let rsrc = resrc.into_type();
-        let r = rsrc.get_mut().downcast_ref::<R>().unwrap();
+        let r = rsrc.get_mut().downcast_ref::<R>().unwrap().clone();
         let boxed = Box::from(r.clone());
         self.undo(mir, Resrc::new(r))
     }
@@ -212,14 +215,14 @@ impl std::ops::SubAssign<usize> for ActionCursor {
 }
 
 //Manages actions and their resources
-pub struct Actman<'ac> {
-    pub actions: VecDeque<Box<dyn ActionTy + 'ac>>,
+pub struct Actman {
+    pub actions: VecDeque<Box<dyn ActionTy>>,
     pub resources: HashMap<u128, Box<dyn ResrcTy>>,
     //indicates position in undo
     pub cursor: ActionCursor,
 }
 //implement actman
-impl<'ac> Actman<'ac> {
+impl Actman {
     pub fn new() -> Self {
         Self {
             actions: VecDeque::new(),
@@ -227,7 +230,7 @@ impl<'ac> Actman<'ac> {
             cursor: ActionCursor::new(),
         }
     }
-    pub fn register_action<T: ActionTy + 'ac>(&mut self, action: T) {
+    pub fn register_action<T: ActionTy + 'static>(&mut self, action: T) {
         //if the actioncursor is not at the front of the queue,
         //we must invalidate everything after the cursor
         if self.cursor.cursor > 0 {
@@ -239,7 +242,7 @@ impl<'ac> Actman<'ac> {
     //Advances the action cursor forward by one. If the cursor is in sync with the latest action
     //(at the front of queue),this does nothing. Otherwise, it executes the action at the current cursors location,
     //and advances by 1
-    pub fn advance(&mut self, mir: &mut Mir) -> Result<()> {
+    pub fn progress(&mut self, mir: &mut Mir) -> Result<()> {
         if !self.cursor.is_valid() {
             return Err(anyhow!("Cursor is not valid!"));
         }

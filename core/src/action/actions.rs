@@ -1,18 +1,16 @@
 use super::*;
-use crate::mir::Mir;
+use crate::{ecs::Id, mir::Mir};
 use ::common::exports::*;
 
-// //----Add entity
-// #[derive(Clone,Resource)]
-// pub struct AddEntityResource {
-//     pub entity: crate::ecs::bevy_ecs::entity::Entity,
-// }
-// pub fn action_add_entity(mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
-//     let entity = mir.em.add_entity("Test".to_string());
-//     let mut rsrc = AddEntityResource {
-//         entity,
-//     };
-//     Ok(Box::new(rsrc))
-// }
-
-//-----
+//Add entity
+pub struct AddEntityResource {
+    pub entity: Id,
+}
+pub fn add_entity(mir: &mut Mir, _: ()) -> Result<AddEntityResource> {
+    let entity = mir.add_entity();
+    Ok(AddEntityResource { entity })
+}
+pub fn undo_add_entity(mir: &mut Mir, rsrc: AddEntityResource) -> Result<()> {
+    mir.em.remove_entity(rsrc.entity);
+    Ok(())
+}
