@@ -24,7 +24,7 @@ use common::{
     uuid,
 };
 use ecs::{Entman, Id};
-
+use kin::*;
 ///A [Note] represents a note that can be created by the user.
 
 #[nvproc::bincode_derive]

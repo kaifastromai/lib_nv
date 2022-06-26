@@ -20,3 +20,4 @@ proc-macro2 = "*"
 lazy_static = "*"
 linkme = "*"
 components_track = { path = "../components_track" }
+kin = { path = "../kin" }

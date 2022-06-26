@@ -118,12 +118,12 @@ impl ArchetypeTy for CharacterArchetype {
                     relationships: vec![
                         Relationship::new(
                             "Mother".to_string(),
-                            ERelationship::parent_child(Parent::Mother, Child::Son),
+                            ERelationship::parent_child(),
                             (0, 0)
                         ),
                         Relationship::new(
                             "Father".to_string(),
-                            ERelationship::parent_child(Parent::Father, Child::Son),
+                            ERelationship::parent_child(),
                             (0, 0)
                         )
                     ]
