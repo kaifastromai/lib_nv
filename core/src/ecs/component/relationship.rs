@@ -9,8 +9,8 @@ pub enum ERelationship {
     Symmetric(Symmetric),
 }
 impl ERelationship {
-    pub fn parent_child(parent: Parent, child: Child) -> Self {
-        ERelationship::MajorMinor(Major::Parent(parent), Minor::Child(child))
+    pub fn parent_child() -> Self {
+        ERelationship::MajorMinor(Major::Parent, Minor::Child)
     }
 }
 impl Default for ERelationship {
@@ -21,7 +21,7 @@ impl Default for ERelationship {
 #[nvproc::bincode_derive]
 #[nvproc::serde_derive]
 pub enum Major {
-    Parent(Parent),
+    Parent,
     Custom(Custom),
 }
 #[nvproc::bincode_derive]
@@ -34,7 +34,7 @@ pub struct Custom {
 #[nvproc::bincode_derive]
 #[nvproc::serde_derive]
 pub enum Minor {
-    Child(Child),
+    Child,
     Custom(Custom),
 }
 #[nvproc::bincode_derive]
@@ -53,34 +53,6 @@ impl Default for Symmetric {
     }
 }
 
-#[nvproc::bincode_derive]
-#[nvproc::serde_derive]
-
-pub enum Parent {
-    Mother,
-    Father,
-}
-#[nvproc::bincode_derive]
-#[nvproc::serde_derive]
-
-pub enum Child {
-    Daughter,
-    Son,
-}
-#[nvproc::bincode_derive]
-#[nvproc::serde_derive]
-
-pub enum Sibling {
-    Sister,
-    Brother,
-}
-#[nvproc::bincode_derive]
-#[nvproc::serde_derive]
-
-pub enum Spouse {
-    Husband,
-    Wife,
-}
 #[nvproc::bincode_derive]
 #[nvproc::serde_derive]
 #[derive(Default)]
@@ -111,14 +83,10 @@ impl Relationship {
     pub fn get_minor_pair(&self) -> Id {
         self.pairs.1
     }
-    pub fn parent_child<T, U>(parent: T, child: U, parent_id: Id, child_id: Id) -> Self
-    where
-        T: Into<Parent>,
-        U: Into<Child>,
-    {
+    pub fn parent_child(parent_id: Id, child_id: Id) -> Self {
         Self::new(
             String::from("ParentChild"),
-            ERelationship::parent_child(parent.into(), child.into()),
+            ERelationship::parent_child(),
             (parent_id, child_id),
         )
     }
@@ -167,13 +135,13 @@ mod test_relationship {
         let ent3 = uuid::gen_128();
         let father = Relationship {
             relationship_name: "FatherSon".to_string(),
-            relation: ERelationship::parent_child(Parent::Father, Child::Son),
+            relation: ERelationship::parent_child(),
             pairs: (ent1, ent2),
         };
-        let m = Parent::Mother;
+        let m = Major::Parent;
         let mother = Relationship {
             relationship_name: "MotherSon".to_string(),
-            relation: ERelationship::parent_child(Parent::Mother, Child::Son),
+            relation: ERelationship::parent_child(),
 
             pairs: (ent1, ent3),
         };
