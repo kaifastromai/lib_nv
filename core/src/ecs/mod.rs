@@ -1,4 +1,5 @@
 pub mod component;
+pub mod kin;
 pub mod prelude;
 pub mod query;
 mod tests;
@@ -214,6 +215,7 @@ impl<'a> IntoIterator for &'a Signature {
 
 #[derive(Debug)]
 #[nvproc::bincode_derive]
+#[nvproc::serde_derive]
 pub struct Entity {
     id: Id,
     is_alive: bool,

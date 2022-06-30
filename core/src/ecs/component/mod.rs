@@ -74,13 +74,12 @@ pub mod components {
 
     #[nvproc::bincode_derive]
     #[nvproc::serde_derive]
-    pub enum EGender {
+    pub enum ESex {
         Male,
         Female,
-        Custom(String),
     }
     //implement default for EGender
-    impl Default for EGender {
+    impl Default for ESex {
         fn default() -> Self {
             Self::Male
         }
@@ -91,8 +90,8 @@ pub mod components {
         age: f32,
     }
     #[component]
-    pub struct GenderComponent {
-        pub gender: EGender,
+    pub struct Sex {
+        pub sex: ESex,
     }
 
     #[component]
