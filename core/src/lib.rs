@@ -24,7 +24,6 @@ use common::{
     uuid,
 };
 use ecs::{Entman, Id};
-use kin::*;
 ///A [Note] represents a note that can be created by the user.
 
 #[nvproc::bincode_derive]
@@ -254,7 +253,7 @@ impl Project {
             notes: HashMap::new(),
         }
     }
-    pub fn set_meta_data(&mut self, meta_data: ProjectMetaData) {
+    pub fn set_metadata(&mut self, meta_data: ProjectMetaData) {
         self.project_meta_data = meta_data;
     }
     pub fn add_manuscript(&mut self, manuscript: Manuscript) {

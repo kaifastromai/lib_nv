@@ -405,6 +405,7 @@ pub fn component_derive(input: TokenStream) -> TokenStream {
             fn get_component_type(&self)->crate::ecs::EComponentTypes{
                  crate::ecs::EComponentTypes::#name
             }
+
         }
 
 
@@ -871,7 +872,7 @@ pub fn query_predicate(attr: TokenStream, item: TokenStream) -> TokenStream {
     let components_list_snake = components_list
         .iter()
         .map(|ident| {
-            let  s = ident.to_string().to_snake_case();
+            let s = ident.to_string().to_snake_case();
             syn::Ident::new(&s, ident.span())
         })
         .collect::<Vec<syn::Ident>>();

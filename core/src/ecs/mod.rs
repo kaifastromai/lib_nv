@@ -1,5 +1,4 @@
 pub mod component;
-pub mod kin;
 pub mod prelude;
 pub mod query;
 mod tests;
@@ -9,7 +8,10 @@ use crate::ecs::query::*;
 use super::*;
 use crate::ecs::component::*;
 use common::{
-    exports::{serde::ser::SerializeMap, *},
+    exports::{
+        serde::ser::{SerializeMap, SerializeStruct},
+        *,
+    },
     type_id::*,
     type_name_any, uuid,
 };
@@ -29,6 +31,7 @@ impl ComponentTypeIdTy for ComponentTypeId {}
 
 pub type Id = u128;
 #[nvproc::bincode_derive]
+#[nvproc::serde_derive]
 #[derive(Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ComponentId {
     id: u128,
@@ -59,8 +62,10 @@ impl From<ComponentId> for u128 {
         id.id
     }
 }
+
+erased_serde::serialize_trait_object!(ComponentTy);
 //A component type.
-pub trait ComponentTy: Any {
+pub trait ComponentTy: Any + erased_serde::Serialize + Send + Sync {
     fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -73,8 +78,13 @@ pub trait ComponentTy: Any {
     fn get_any(&self) -> &dyn ComponentTy;
     fn get_any_mut(&mut self) -> &mut dyn ComponentTy;
     fn get_component_type(&self) -> EComponentTypes;
-    fn serialize(&self) -> Result<Vec<u8>> {
-        todo!()
+    fn serialize_component(&self, s: &mut dyn erased_serde::Serializer) -> Result<()> {
+        self.erased_serialize(s)?;
+        Ok(())
+    }
+    fn deserialize_component(&mut self, d: &mut dyn erased_serde::Deserializer<'_>) -> Result<()> {
+        erased_serde::deserialize(d)?;
+        Ok(())
     }
 }
 
@@ -282,6 +292,7 @@ pub struct EntityRefMut<'a> {
     entity: Id,
     entman: &'a mut Entman,
 }
+
 ///Represents an entity that owns all its components
 pub struct EntityOwned {
     id: Id,
@@ -293,8 +304,20 @@ impl EntityOwned {
         self.signature.clone()
     }
 }
+impl serde::Serialize for EntityOwned {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("EntityOwned", 3)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("signature", &self.signature)?;
+        state.serialize_field("components", &self.components)?;
+        state.end()
+    }
+}
 
-pub trait CommonComponentStoreTy: Any {
+pub trait CommonComponentStoreTy: Any + Send + Sync {
     fn get_type_id(&self) -> TypeId;
     fn get_common_type_name(&self) -> &str;
     fn get_any(&self) -> &dyn CommonComponentStoreTy;
@@ -389,7 +412,21 @@ impl DynamicComponent {
         self.type_id
     }
 }
+impl serde::Serialize for DynamicComponent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("DynamicComponent", 2)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("owning_entity", &self.owning_entity)?;
+        let comp_name = self.component.get_component_name();
+        state.serialize_field(comp_name, &self.component)?;
+        state.end()
+    }
+}
 #[nvproc::bincode_derive]
+#[nvproc::serde_derive]
 pub struct Component<T: ComponentTyReqs> {
     id: ComponentId,
     pub owning_entity: Option<Id>,
@@ -536,12 +573,7 @@ impl<'a, T: ComponentTyReqs> std::ops::Deref for Component<T> {
 
 //Stores all compoments of a common type.
 type EntityId = u128;
-#[nvproc::bincode_derive]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Copy)]
-pub struct OrphanComponent {
-    id: ComponentId,
-    previous_owner: Id,
-}
+
 #[nvproc::bincode_derive]
 pub struct CommonComponentStore<T: ComponentTyReqs> {
     //the typs of component this store contains
@@ -583,7 +615,11 @@ impl<T: ComponentTyReqs> CommonComponentStore<T> {
         }
     }
     pub fn insert_dynamic(&mut self, component: DynamicComponent) -> Result<()> {
-        match self.components.get(&component.owning_entity.unwrap()) {
+        match self.components.get(
+            &component
+                .owning_entity
+                .expect("Component has no owning entity!"),
+        ) {
             Some(_) => Err(anyhow! {"Entity already has component of type {}", self.type_name}),
             None => {
                 self.components.insert(
@@ -906,6 +942,18 @@ impl Entman {
 
         ent
     }
+    //Merge the entities of an archetype into this entity
+    pub fn merge_archetype<T: ArchetypeTy>(&mut self, archetype: T, entity: Id) -> Id {
+        let desc = archetype.describe();
+        let sig = desc.get_signature();
+
+        let entity_mut = self.get_entity_mut(entity).unwrap();
+        for c in desc.take_components().into_iter() {
+            c.insert_component_into_storage(&mut self.storage, entity);
+        }
+
+        entity
+    }
     //Removes the entity from the entity manager
     pub fn remove_entity(&mut self, entity: Id) {
         self.entities.remove(&entity);
@@ -969,7 +1017,7 @@ impl Entman {
     }
 
     pub fn get_entity_owned(&self, entity: Id) -> Result<EntityOwned> {
-        let sig = self.get_entity(entity).unwrap().get_signature();
+        let sig = self.get_entity(entity)?.get_signature();
         let components = self.storage.get_entity_owned_components(entity)?;
         Ok(EntityOwned {
             id: entity,
@@ -997,6 +1045,10 @@ impl Entman {
     }
     pub fn get_components_dyn_ref(&self, entity: Id) -> Result<Vec<&dyn ComponentTy>> {
         self.storage.get_components_dyn_ref(entity)
+    }
+    //returns a vector of [DynamicComponent]
+    pub fn get_components_dynamic(&self, entity: Id) -> Result<Vec<DynamicComponent>> {
+        self.storage.get_entity_owned_components(entity)
     }
 
     ///Runs the given query, returning a vector of entities that match the query.

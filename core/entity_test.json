@@ -1,0 +1,95 @@
+{
+    "id": 201710668231887573307240976406764370305,
+    "signature": [
+        {
+            "id": 10516021624157953741
+        },
+        {
+            "id": 2972441071060274729
+        },
+        {
+            "id": 2972441071060274729
+        },
+        {
+            "id": 2972441071060274729
+        },
+        {
+            "id": 2299033021005198342
+        },
+        {
+            "id": 4902428333921078998
+        }
+    ],
+    "components": [
+        {
+            "id": {
+                "id": 103891466745786644387621505558474829597
+            },
+            "owning_entity": 201710668231887573307240976406764370305,
+            "NumericalFieldComponent": {
+                "name": "Age",
+                "value": 0.0
+            }
+        },
+        {
+            "id": {
+                "id": 129529285040062061664618529145163429946
+            },
+            "owning_entity": 201710668231887573307240976406764370305,
+            "StringFieldComponent": {
+                "name": "Description",
+                "value": ""
+            }
+        },
+        {
+            "id": {
+                "id": 155408071515788042078401419269277327643
+            },
+            "owning_entity": 201710668231887573307240976406764370305,
+            "CharacterNameComponent": {
+                "name": {
+                    "given_name": "Given name",
+                    "other_names": [],
+                    "family_name": "Family name"
+                },
+                "aliases": []
+            }
+        },
+        {
+            "id": {
+                "id": 103406640933824885487751851225089336860
+            },
+            "owning_entity": 201710668231887573307240976406764370305,
+            "RelationshipComponent": {
+                "relationships": [
+                    {
+                        "relationship_name": "Mother",
+                        "relation": {
+                            "MajorMinor": [
+                                "Parent",
+                                "Child"
+                            ]
+                        },
+                        "pairs": [
+                            0,
+                            0
+                        ]
+                    },
+                    {
+                        "relationship_name": "Father",
+                        "relation": {
+                            "MajorMinor": [
+                                "Parent",
+                                "Child"
+                            ]
+                        },
+                        "pairs": [
+                            0,
+                            0
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

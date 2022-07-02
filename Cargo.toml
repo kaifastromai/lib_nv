@@ -6,5 +6,5 @@ members = [
     "components_track",
     "sdsl",
     "server",
-    "kin",
+   
 ]

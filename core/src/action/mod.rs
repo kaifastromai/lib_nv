@@ -67,10 +67,74 @@ pub trait ActionTy {
     fn set_id(&mut self, id: u128);
 }
 
-//An action represents something that induce a change in the current state of the kernel.
-//An action contains two functions, one that executes the action, and optionaly one that undoes the action.
-//Th executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
-//Th undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
+pub struct StaticAction<
+     R: ResrcTy,
+    P: Clone,
+    E: Fn(&mut Mir, P) -> Result<Box<R>>,
+    U: Fn(&mut Mir, Resrc<&R>),
+> {
+    pub action_id: u128,
+    pub param: P,
+    exec: E,
+    undo: Option<U>,
+    pub is_complete: bool,
+}
+impl<R: ResrcTy, P: Clone,const  E: dyn Fn(&mut Mir, P) -> Result<Box<R>>, U: Fn(&mut Mir, Resrc<&R>)>
+    StaticAction<R, P, E, U>
+{
+    pub fn exec(&mut self, mir: &mut Mir) -> Result<Box<R>> {
+        self.is_complete = true;
+        (self.exec)(mir, self.param.clone())
+    }
+    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&R>) -> Result<()> {
+        if self.is_complete {
+            let res = match &self.undo {
+                Some(u) => Ok(u),
+                None => Err(anyhow!("This action has no undo!")),
+            }?;
+            (res)(mir, resrc);
+            self.is_complete = false;
+        };
+        return Err(anyhow!(
+            "Action {} has not yet been completed and cannot be undone!",
+            self.action_id
+        ));
+    }
+}
+impl<
+        R: ResrcTy + Clone + 'static,
+        P: Clone,
+        E: Fn(&mut Mir, P) -> Result<Box<R>>,
+        U: Fn(&mut Mir, Resrc<&R>),
+    > ActionTy for StaticAction<R, P, E, U>
+{
+    fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
+        let res = self.exec(mir)?;
+        //convert R to Box<dyn ResrcTy>
+        let r = (Box::from(*res) as Box<dyn ResrcTy>);
+        //convert to to box
+        Ok(r)
+    }
+
+    fn undo(&mut self, mir: &mut Mir, rsrc: Resrc<&mut dyn ResrcTy>) -> Result<()> {
+        let rsrc = rsrc.into_type();
+        let r = rsrc.get_mut().downcast_ref::<R>().unwrap();
+        let boxed = Box::from(r.clone());
+        self.undo(mir, Resrc::new(r))
+    }
+
+    fn action_id(&self) -> u128 {
+        self.action_id
+    }
+
+    fn set_id(&mut self, id: u128) {
+        self.action_id = id;
+    }
+}
+///An [Action] represents something that induce a change in the current state of the kernel, that is on [Mir].
+///An action contains two functions, one that executes the action, and optionaly one that undoes the action.
+///The executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
+///The undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
 pub struct Action<'a, R: ResrcTy, P: Clone> {
     pub action_id: u128,
     pub param: P,

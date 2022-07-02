@@ -1,4 +1,5 @@
-use std::io::{BufReader, BufWriter};
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write};
 
 use common::exports::bincode::config::Config;
 use common::exports::bincode::{Decode, Encode};
@@ -180,4 +181,21 @@ fn test_get_type_name_from_store() {
     let ccs_any = ccs.get_any_owned();
     let name = ccs_any.get_common_type_name();
     assert_eq!(name, "StringFieldComponent");
+}
+#[test]
+fn test_generate_component_json() -> Result<()> {
+    let mut em = Entman::new();
+
+    let character= archetypes::CharacterArchetype {};
+    let entity = em.entity_from_archetype(character);
+    em.entity_from_archetype(character);
+    let nc = NameComponent {
+        name: "name".to_string(),
+        aliases: vec![],
+    };
+    let owned=em.get_entity_owned(entity)?;
+    let json=serde_json::to_string(&owned)?;
+    let mut file = File::create("entity_test.json")?;
+    file.write_all(json.as_bytes())?;
+    Ok(())
 }

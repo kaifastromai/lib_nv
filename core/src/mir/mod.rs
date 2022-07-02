@@ -54,50 +54,16 @@ impl<'a> Mir<'a> {
             actman: Actman::new(),
         }
     }
-    //adds an entity
-    pub fn add_entity(&mut self) -> Id {
-        self.em.add_entity()
-    }
-    pub fn add_component<T: ComponentTy + common::exports::serde::Serialize + Clone>(
-        &mut self,
-        entity: Id,
-        component: T,
-    ) {
-        self.em.add_component(entity, component);
-    }
-    pub fn add_archetype<T: crate::ecs::component::archetypes::ArchetypeTy>(
-        &mut self,
-        entity: Id,
-        archetype: T,
-    ) -> Id {
-        self.em.entity_from_archetype(archetype)
-    }
 
     pub fn create_project(&mut self, name: String, desc: String) {
         self.proj.project_meta_data.name = name;
         self.proj.description = desc;
     }
-    pub fn get_entity_count(&self) -> usize {
-        self.em.get_entity_count()
+    ///Run any function or closure on Mir
+    pub fn exec<F: Fn(&mut Mir) -> R, R>(&mut self, f: F) -> R {
+        f(self)
     }
-    pub fn get_entity(&self, id: Id) -> Entity {
-        self.em.get_entity_clone(id)
-    }
-    pub fn get_all_living_entities(&self) -> Vec<Id> {
-        self.em.get_all_living_entities()
-    }
-    pub fn get_component_ref<T: ComponentTyReqs>(
-        &self,
-        entity: Id,
-    ) -> Result<&crate::ecs::Component<T>> {
-        self.em.get_component_ref(entity)
-    }
-    pub fn get_component_by_id_ref<T: ComponentTyReqs>(
-        &self,
-        id: ComponentId,
-    ) -> Result<&crate::ecs::Component<T>> {
-        self.em.get_component_by_id_ref(id)
-    }
+
     pub fn load_from_file(path: &str) -> Result<Mir> {
         let mut br = BufReader::new(File::open(path)?);
         let mir: Mir = bincode::decode_from_reader(br, bincode::config::standard())?;
@@ -113,7 +79,7 @@ mod test_mir {
     #[test]
     fn test_serde() {
         let mut mir = Mir::new();
-        mir.proj.set_meta_data(ProjectMetaData {
+        mir.proj.set_metadata(ProjectMetaData {
             name: "test_name".to_string(),
             author: "test_author".to_string(),
             description: "test_description".to_string(),

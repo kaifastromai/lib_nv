@@ -17,9 +17,9 @@ pub struct PubResponse {
     pub name: String,
     pub ent_id: Id,
 }
-pub fn get_entity(mir: &mut Mir, p: (String, i32)) -> Result<PubResponse> {
-    let ent_id = mir.add_entity();
-    let mut res = PubResponse { name: p.0, ent_id };
+pub fn get_entity(mir: &mut Mir, p: (String, i32)) -> Result<(String, Id)> {
+    let ent_id = mir.em.add_entity();
+    let mut res = (p.0, ent_id);
     Ok(res)
 }
 pub fn test_fn(mir: &mut Mir, p: TestParam) -> Result<Box<TestRsrc>> {
@@ -52,7 +52,9 @@ fn test_action_register() {
     act.advance(&mut mir);
     act.regress(&mut mir);
 
-    assert_eq!(mir.get_entity_count(), 0);
+    assert_eq!(mir.exec(|m|{
+        m.em.get_entity_count()
+    }), 0);
 }
 #[test]
 fn test_action_request() {
@@ -60,5 +62,5 @@ fn test_action_request() {
     let mut mir = Mir::new();
     let mut reqman = Reqman::new();
     let res = reqman.request(req, &mut mir).unwrap();
-    assert_eq!(res.name, "test");
+    assert_eq!(res.0, "test");
 }
