@@ -24,16 +24,16 @@ use dyn_clone::DynClone;
 pub trait ResrcTy {
     fn get_mut(&mut self) -> &mut dyn Any;
 }
+
+impl<T: Any> ResrcTy for T {
+    fn get_mut(&mut self) -> &mut dyn Any {
+        self as &mut dyn Any
+    }
+}
 pub trait ParamTy: Clone {
     fn get_param(self) -> Box<dyn Any>;
 }
 pub struct Param<T: ParamTy>(T);
-
-impl ResrcTy for () {
-    fn get_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
 
 //A thin wrapper around a resource.
 pub struct Resrc<T>(T);
@@ -47,11 +47,7 @@ impl<T> Resrc<T> {
         Resrc(t)
     }
 }
-impl ResrcTy for Box<dyn ResrcTy> {
-    fn get_mut(&mut self) -> &mut dyn Any {
-        self.get_mut()
-    }
-}
+
 //impl deref for Resrc<T> that returns the inner type
 impl<T> std::ops::Deref for Resrc<T> {
     type Target = T;
@@ -67,11 +63,15 @@ pub trait ActionTy {
     fn set_id(&mut self, id: u128);
 }
 
+pub trait ExecTy<P, R>: Fn(&mut Mir, P) -> Result<Box<R>> {}
+impl<P, R, F: Fn(&mut Mir, P) -> Result<Box<R>>> ExecTy<P, R> for F {}
+pub trait UndoTy<R>: Fn(&mut Mir, Resrc<&R>) -> Result<()> {}
+impl<R, F: Fn(&mut Mir, Resrc<&R>) -> Result<()>> UndoTy<R> for F {}
 pub struct StaticAction<
-     R: ResrcTy,
+    R: ResrcTy,
     P: Clone,
     E: Fn(&mut Mir, P) -> Result<Box<R>>,
-    U: Fn(&mut Mir, Resrc<&R>),
+    U: Fn(&mut Mir, Resrc<&R>) -> Result<()>,
 > {
     pub action_id: u128,
     pub param: P,
@@ -79,9 +79,22 @@ pub struct StaticAction<
     undo: Option<U>,
     pub is_complete: bool,
 }
-impl<R: ResrcTy, P: Clone,const  E: dyn Fn(&mut Mir, P) -> Result<Box<R>>, U: Fn(&mut Mir, Resrc<&R>)>
-    StaticAction<R, P, E, U>
+impl<
+        R: ResrcTy,
+        P: Clone,
+        E: Fn(&mut Mir, P) -> Result<Box<R>>,
+        U: Fn(&mut Mir, Resrc<&R>) -> Result<()>,
+    > StaticAction<R, P, E, U>
 {
+    const fn new(p: P, e: E, u: Option<U>, id: u128) -> Self {
+        StaticAction {
+            action_id: id,
+            param: p,
+            exec: e,
+            undo: u,
+            is_complete: false,
+        }
+    }
     pub fn exec(&mut self, mir: &mut Mir) -> Result<Box<R>> {
         self.is_complete = true;
         (self.exec)(mir, self.param.clone())
@@ -105,7 +118,7 @@ impl<
         R: ResrcTy + Clone + 'static,
         P: Clone,
         E: Fn(&mut Mir, P) -> Result<Box<R>>,
-        U: Fn(&mut Mir, Resrc<&R>),
+        U: Fn(&mut Mir, Resrc<&R>) -> Result<()>,
     > ActionTy for StaticAction<R, P, E, U>
 {
     fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {

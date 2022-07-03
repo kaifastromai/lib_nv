@@ -8,7 +8,7 @@ use super::*;
 pub struct TestParam {
     name: String,
 }
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Clone)]
 pub struct TestRsrc {
     pub name: String,
     pub ent_id: Id,
@@ -52,15 +52,15 @@ fn test_action_register() {
     act.advance(&mut mir);
     act.regress(&mut mir);
 
-    assert_eq!(mir.exec(|m|{
-        m.em.get_entity_count()
-    }), 0);
+    assert_eq!(mir.exec(|m| { m.em.get_entity_count() }), 0);
 }
 #[test]
 fn test_action_request() {
-    let req = Request::new(&get_entity, (String::from("test"), 1));
+    let req = Request::new(&get_entity);
     let mut mir = Mir::new();
     let mut reqman = Reqman::new();
-    let res = reqman.request(req, &mut mir).unwrap();
+    let res = reqman
+        .request(req, &mut mir, ("test".to_string(), 1))
+        .unwrap();
     assert_eq!(res.0, "test");
 }

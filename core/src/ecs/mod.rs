@@ -65,7 +65,7 @@ impl From<ComponentId> for u128 {
 
 erased_serde::serialize_trait_object!(ComponentTy);
 //A component type.
-pub trait ComponentTy: Any + erased_serde::Serialize + Send + Sync {
+pub trait ComponentTy: Any + erased_serde::Serialize + Send + Sync + dyn_clone::DynClone {
     fn get_component_type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -294,6 +294,7 @@ pub struct EntityRefMut<'a> {
 }
 
 ///Represents an entity that owns all its components
+#[derive(Clone)]
 pub struct EntityOwned {
     id: Id,
     signature: Signature,
@@ -328,6 +329,7 @@ pub trait CommonComponentStoreTy: Any + Send + Sync {
     fn get_dynamic_component(&self, entity: Id) -> Result<DynamicComponent>;
     ///Returns the component of a given entity as &dyn ComponentTy
     fn get_component_dyn_ref(&self, entity: Id) -> Result<&dyn ComponentTy>;
+    fn remove_component(&mut self, entity: Id) -> Result<()>;
 }
 
 impl dyn CommonComponentStoreTy {
@@ -389,15 +391,28 @@ impl<T: ComponentTyReqs> CommonComponentStoreTy for CommonComponentStore<T> {
     fn get_component_dyn_ref(&self, entity: Id) -> Result<&dyn ComponentTy> {
         self.get_entity_components_as_dyn_ref_internal(entity)
     }
+    fn remove_component(&mut self, entity: Id) -> Result<()> {
+        let c = self
+            .components
+            .remove(&entity)
+            .ok_or(anyhow!("Entity does not exist"))?;
+        Ok(())
+    }
 }
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+//#[derive(Clone)]
 pub struct DynamicComponent {
     id: ComponentId,
     pub owning_entity: Option<Id>,
     component: Box<dyn ComponentTy>,
     type_id: TypeId,
+}
+impl Clone for DynamicComponent {
+    fn clone(&self) -> Self {
+        dyn_clone::clone(self)
+    }
 }
 impl DynamicComponent {
     pub fn from_component<T: ComponentTyReqs>(component: Component<T>) -> Self {
@@ -468,11 +483,11 @@ impl<T: ComponentTyReqs> Component<T> {
                 .clone(),
         }
     }
-    pub fn into_dynamic(self) -> DynamicComponent {
+    pub fn into_dynamic(&self) -> DynamicComponent {
         DynamicComponent {
             id: self.id,
             owning_entity: self.owning_entity,
-            component: Box::new(self.component),
+            component: Box::new(self.component.clone()),
             type_id: TypeId::of::<T>(),
         }
     }
@@ -881,6 +896,43 @@ impl Storage {
             store.remove_entity_components(entity);
         }
     }
+    pub fn remove_component<T: ComponentTyReqs>(&mut self, entity: Id) -> Result<()> {
+        let id = TypeId::of::<T>();
+        match self.bins.contains_key(&id) {
+            true => {
+                let mut store = self.bins.get_mut(&id).unwrap();
+                //downcast to the correct type
+                let store = store
+                    .as_mut()
+                    .get_any_mut()
+                    .downcast_mut::<CommonComponentStore<T>>()
+                    .unwrap();
+                store.remove(entity);
+            }
+            false => {
+                return Err(anyhow!(
+                    "No component store of type {} has yet been created",
+                    std::any::type_name::<T>()
+                ))
+            }
+        }
+        Ok(())
+    }
+    pub fn remove_component_by_type_id(&mut self, entity: Id, type_id: TypeId) -> Result<()> {
+        match self.bins.contains_key(&type_id) {
+            true => {
+                let mut store = self.bins.get_mut(&type_id).unwrap();
+                store.remove_component(entity);
+            }
+            false => {
+                return Err(anyhow!(
+                    "No component store of type {} has yet been created",
+                    type_id.get_name_ref()
+                ))
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -928,7 +980,7 @@ impl Entman {
         self.entities.insert(ent, Entity::new(ent));
         ent
     }
-    //Creates a new entity from an archetype
+    ///Creates a new entity from an archetype
     pub fn entity_from_archetype<T: ArchetypeTy>(&mut self, archetype: T) -> Id {
         let ent = uuid::gen_128();
         let desc = archetype.describe();
@@ -941,6 +993,15 @@ impl Entman {
         }
 
         ent
+    }
+    ///Create an entity from an [EntityOwned], returning the id
+    pub fn entity_from_owned(&mut self, e: EntityOwned) -> Result<Id> {
+        let entity = Entity::from_sig(e.id, e.get_signature());
+        self.entities.insert(e.id, entity);
+        for c in e.components {
+            self.storage.insert_dynamic(c)?;
+        }
+        Ok(e.id)
     }
     //Merge the entities of an archetype into this entity
     pub fn merge_archetype<T: ArchetypeTy>(&mut self, archetype: T, entity: Id) -> Id {
@@ -1037,6 +1098,7 @@ impl Entman {
     ) -> Result<&Component<T>> {
         self.storage.get_component_by_id_ref(id)
     }
+    //Returns a reference to a component of an entity, if it exists
     pub fn get_component_mut<T: ComponentTyReqs>(
         &mut self,
         entity: Id,
@@ -1046,9 +1108,19 @@ impl Entman {
     pub fn get_components_dyn_ref(&self, entity: Id) -> Result<Vec<&dyn ComponentTy>> {
         self.storage.get_components_dyn_ref(entity)
     }
-    //returns a vector of [DynamicComponent]
+    //Rreturns a vector of [DynamicComponent]
     pub fn get_components_dynamic(&self, entity: Id) -> Result<Vec<DynamicComponent>> {
         self.storage.get_entity_owned_components(entity)
+    }
+    pub fn remove_component<T: ComponentTyReqs>(&mut self, entity: Id) -> Result<()> {
+        self.storage.remove_component::<T>(entity)
+    }
+    pub fn remove_component_by_type_id(
+        &mut self,
+        type_id: common::type_id::TypeId,
+        entity: Id,
+    ) -> Result<()> {
+        self.storage.remove_component_by_type_id(entity, type_id)
     }
 
     ///Runs the given query, returning a vector of entities that match the query.
