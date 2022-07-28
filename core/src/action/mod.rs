@@ -5,6 +5,9 @@
 use ::common::exports::anyhow::{anyhow, Result};
 use ::common::uuid;
 use nvproc::{undo_action, Resource};
+use std::cell::Cell;
+use std::hash::Hash;
+use std::sync::Arc;
 use std::{
     any::Any,
     collections::{HashMap, VecDeque},
@@ -57,49 +60,82 @@ impl<T> std::ops::Deref for Resrc<T> {
 }
 
 pub trait ActionTy {
-    fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>>;
+    fn exec(&mut self, mir: &mut Mir) -> Result<(Box<dyn ResrcTy>, Box<dyn RvTy>)>;
     fn undo(&mut self, mir: &mut Mir, rsrc: Resrc<&mut dyn ResrcTy>) -> Result<()>;
     fn action_id(&self) -> u128;
     fn set_id(&mut self, id: u128);
 }
+pub trait RvTy: Any + dyn_clone::DynClone {}
+impl<T: Any + dyn_clone::DynClone> RvTy for T {}
+dyn_clone::clone_trait_object!(RvTy);
+pub struct ReturnValue<Rv: RvTy + Clone> {
+    pub rv: Option<Rv>,
+}
+impl<Rv: RvTy + Clone> ReturnValue<Rv> {
+    pub fn new(rv: Option<Rv>) -> Self {
+        ReturnValue { rv }
+    }
+    pub fn fill(&mut self, rv: Rv) {
+        self.rv = Some(rv);
+    }
+    pub fn get(&self) -> Result<Rv> {
+        self.rv
+            .clone()
+            .ok_or(anyhow!("the return value has not been filled yet"))
+    }
+}
 
-pub trait ExecTy<P, R>: Fn(&mut Mir, P) -> Result<Box<R>> {}
-impl<P, R, F: Fn(&mut Mir, P) -> Result<Box<R>>> ExecTy<P, R> for F {}
-pub trait UndoTy<R>: Fn(&mut Mir, Resrc<&R>) -> Result<()> {}
-impl<R, F: Fn(&mut Mir, Resrc<&R>) -> Result<()>> UndoTy<R> for F {}
-pub struct StaticAction<
-    R: ResrcTy,
-    P: Clone,
-    E: Fn(&mut Mir, P) -> Result<Box<R>>,
-    U: Fn(&mut Mir, Resrc<&R>) -> Result<()>,
-> {
+///Executor function is a function that takes a mutable reference to the Mir, a parameter P, and returns
+/// a Result with a boxed resource Rsrc, and return value Rv. The boxed resource is used to store any state that
+/// is needed by the [UndoTy] function. The return value Rv is a value that will be returned to the caller of the
+/// action
+pub trait ExecTy<P, Rsrc: ResrcTy, Rv: RvTy>: Fn(&mut Mir, P) -> Result<Box<(Rsrc, Rv)>> {}
+impl<P, Rsrc: ResrcTy, Rv: RvTy, F: Fn(&mut Mir, P) -> Result<Box<(Rsrc, Rv)>>> ExecTy<P, Rsrc, Rv>
+    for F
+{
+}
+pub trait UndoTy<Rsrc: ResrcTy>: Fn(&mut Mir, Resrc<&Rsrc>) -> Result<()> {}
+impl<Rsrc: ResrcTy, F: Fn(&mut Mir, Resrc<&Rsrc>) -> Result<()>> UndoTy<Rsrc> for F {}
+pub struct StaticAction<Rsrc: ResrcTy, P: Clone, Rv: RvTy, E: ExecTy<P, Rsrc, Rv>, U: UndoTy<Rsrc>>
+{
     pub action_id: u128,
     pub param: P,
     exec: E,
     undo: Option<U>,
     pub is_complete: bool,
+    phantom: std::marker::PhantomData<Rsrc>,
+    phantom2: std::marker::PhantomData<Rv>,
 }
-impl<
-        R: ResrcTy,
-        P: Clone,
-        E: Fn(&mut Mir, P) -> Result<Box<R>>,
-        U: Fn(&mut Mir, Resrc<&R>) -> Result<()>,
-    > StaticAction<R, P, E, U>
+impl<Rsrc: ResrcTy, P: Clone, Rv: RvTy, E: ExecTy<P, Rsrc, Rv>, U: UndoTy<Rsrc>>
+    StaticAction<Rsrc, P, Rv, E, U>
 {
-    const fn new(p: P, e: E, u: Option<U>, id: u128) -> Self {
+    const fn new_static(p: P, e: E, u: Option<U>, id: u128) -> Self {
         StaticAction {
             action_id: id,
             param: p,
             exec: e,
             undo: u,
             is_complete: false,
+            phantom: std::marker::PhantomData,
+            phantom2: std::marker::PhantomData,
         }
     }
-    pub fn exec(&mut self, mir: &mut Mir) -> Result<Box<R>> {
+    fn new(p: P, e: E, u: Option<U>) -> Self {
+        StaticAction {
+            action_id: uuid::gen_128(),
+            param: p,
+            exec: e,
+            undo: u,
+            is_complete: false,
+            phantom: std::marker::PhantomData,
+            phantom2: std::marker::PhantomData,
+        }
+    }
+    pub fn exec(&mut self, mir: &mut Mir) -> Result<Box<(Rsrc, Rv)>> {
         self.is_complete = true;
         (self.exec)(mir, self.param.clone())
     }
-    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&R>) -> Result<()> {
+    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&Rsrc>) -> Result<()> {
         if self.is_complete {
             let res = match &self.undo {
                 Some(u) => Ok(u),
@@ -115,23 +151,27 @@ impl<
     }
 }
 impl<
-        R: ResrcTy + Clone + 'static,
+        Rsrc: ResrcTy + Clone + 'static,
         P: Clone,
-        E: Fn(&mut Mir, P) -> Result<Box<R>>,
-        U: Fn(&mut Mir, Resrc<&R>) -> Result<()>,
-    > ActionTy for StaticAction<R, P, E, U>
+        Rv: RvTy,
+        E: ExecTy<P, Rsrc, Rv>,
+        U: UndoTy<Rsrc>,
+    > ActionTy for StaticAction<Rsrc, P, Rv, E, U>
 {
-    fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
+    fn exec(&mut self, mir: &mut Mir) -> Result<(Box<dyn ResrcTy>, Box<dyn RvTy>)> {
         let res = self.exec(mir)?;
         //convert R to Box<dyn ResrcTy>
-        let r = (Box::from(*res) as Box<dyn ResrcTy>);
+        let r = (
+            Box::from(res.0) as Box<dyn ResrcTy>,
+            Box::from(res.1) as Box<dyn RvTy>,
+        );
         //convert to to box
         Ok(r)
     }
 
     fn undo(&mut self, mir: &mut Mir, rsrc: Resrc<&mut dyn ResrcTy>) -> Result<()> {
         let rsrc = rsrc.into_type();
-        let r = rsrc.get_mut().downcast_ref::<R>().unwrap();
+        let r = rsrc.get_mut().downcast_ref::<Rsrc>().unwrap();
         let boxed = Box::from(r.clone());
         self.undo(mir, Resrc::new(r))
     }
@@ -148,7 +188,7 @@ impl<
 ///An action contains two functions, one that executes the action, and optionaly one that undoes the action.
 ///The executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
 ///The undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
-pub struct Action<'a, R: ResrcTy, P: Clone> {
+/* pub struct Action<'a, R: ResrcTy, P: Clone> {
     pub action_id: u128,
     pub param: P,
     exec: &'a dyn Fn(&mut Mir, P) -> Result<Box<R>>,
@@ -219,8 +259,7 @@ impl<'a, R: ResrcTy + Clone + 'static, P: Clone> ActionTy for Action<'a, R, P> {
     fn set_id(&mut self, id: u128) {
         self.action_id = id;
     }
-}
-
+} */
 //Actman manages the actions and any resources that they may need.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -292,6 +331,7 @@ impl std::ops::SubAssign<usize> for ActionCursor {
 pub struct Actman<'ac> {
     pub actions: VecDeque<Box<dyn ActionTy + 'ac>>,
     pub resources: HashMap<u128, Box<dyn ResrcTy>>,
+    pub return_values: HashMap<u128, Arc<Cell<Option<Box<dyn RvTy>>>>>,
     //indicates position in undo
     pub cursor: ActionCursor,
 }
@@ -302,6 +342,7 @@ impl<'ac> Actman<'ac> {
             actions: VecDeque::new(),
             resources: HashMap::new(),
             cursor: ActionCursor::new(),
+            return_values: HashMap::new(),
         }
     }
     pub fn register_action<T: ActionTy + 'ac>(&mut self, action: T) {
@@ -313,6 +354,30 @@ impl<'ac> Actman<'ac> {
         self.cursor = self.actions.len().into();
         self.actions.push_front(Box::new(action));
     }
+    pub fn register_action_with_rv<
+        Rsrc: ResrcTy + Clone + 'static,
+        P: Clone + 'static,
+        Rv: RvTy + Clone + 'static,
+        E: ExecTy<P, Rsrc, Rv> + 'static,
+        U: UndoTy<Rsrc> + 'static,
+    >(
+        &mut self,
+        action: StaticAction<Rsrc, P, Rv, E, U>,
+    ) -> Arc<Option<Cell<Box<Rv>>>> {
+        //if the actioncursor is not at the front of the queue,
+        //we must invalidate everything after the cursor
+        if self.cursor.cursor > 0 {
+            self.actions.drain(self.cursor.cursor as usize..);
+        }
+        self.return_values
+            .insert(action.action_id(), Arc::new(Cell::new(None)));
+        let r = self.return_values.get(&action.action_id()).unwrap().clone();
+
+        let res = unsafe { std::mem::transmute::<_, Arc<Option<Cell<Box<Rv>>>>>(r) };
+        self.cursor = self.actions.len().into();
+        self.actions.push_front(Box::new(action));
+        res
+    }
     //Advances the action cursor forward by one. If the cursor is in sync with the latest action
     //(at the front of queue),this does nothing. Otherwise, it executes the action at the current cursors location,
     //and advances by 1
@@ -322,7 +387,12 @@ impl<'ac> Actman<'ac> {
         }
         let mut action = self.actions.get_mut(self.cursor.into()).unwrap();
         //execute and collect any resources
-        let rsrc = action.exec(mir)?;
+        let (rsrc, retval) = action.exec(mir)?;
+        let a = self
+            .return_values
+            .get_mut(&action.action_id())
+            .ok_or(anyhow!("Could not find return value"))?;
+        a.set(Some(retval));
         //generate a resource id
         let resource_id = uuid::gen_128();
         action.set_id(resource_id);

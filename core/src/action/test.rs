@@ -2,6 +2,7 @@ use nvproc::Param;
 
 use crate::ecs::Id;
 
+use super::actions::*;
 use super::request::{Reqman, Request};
 use super::*;
 #[derive(Clone, Param)]
@@ -22,14 +23,14 @@ pub fn get_entity(mir: &mut Mir, p: (String, i32)) -> Result<(String, Id)> {
     let mut res = (p.0, ent_id);
     Ok(res)
 }
-pub fn test_fn(mir: &mut Mir, p: TestParam) -> Result<Box<TestRsrc>> {
+pub fn test_fn(mir: &mut Mir, p: TestParam) -> Result<Box<(TestRsrc, ())>> {
     let ent = mir.em.add_entity();
     let name = "test";
     let mut rsrc = TestRsrc {
         name: name.to_string(),
         ent_id: ent,
     };
-    Ok(Box::new(rsrc))
+    Ok(Box::new((rsrc, ())))
 }
 pub fn undo(mir: &mut Mir, rsrc: Resrc<&TestRsrc>) -> Result<()> {
     mir.em.remove_entity(rsrc.ent_id);
@@ -38,12 +39,12 @@ pub fn undo(mir: &mut Mir, rsrc: Resrc<&TestRsrc>) -> Result<()> {
 
 #[test]
 fn test_action_register() {
-    let action = Action::new(
-        &test_fn,
-        &undo,
+    let action = StaticAction::new(
         TestParam {
             name: "test".to_string(),
         },
+        &test_fn,
+        Some(&undo),
     );
     let mut mir = Mir::new();
 
@@ -63,4 +64,18 @@ fn test_action_request() {
         .request(req, &mut mir, ("test".to_string(), 1))
         .unwrap();
     assert_eq!(res.0, "test");
+}
+#[test]
+fn test_action_constructor() {
+    let mut mir = Mir::new();
+    let mut actman = Actman::new();
+    let ret_val = actman.register_action_with_rv(AddEntityConstructor {}.construct());
+    actman.advance(&mut mir);
+
+    //mir should now have one entity
+    assert_eq!(mir.em.get_entity_count(), 1);
+    assert!(ret_val.is_some());
+    //make sure the returned id is valid
+    let id = ret_val.unwrap().take();
+    assert!(mir.em.get_entity_clone(*id).is_ok());
 }

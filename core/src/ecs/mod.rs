@@ -1063,9 +1063,12 @@ impl Entman {
             .get(&entity)
             .ok_or(anyhow!("Entity with id {} not found", entity))
     }
-    pub fn get_entity_clone(&self, entity: Id) -> Entity {
-        let e = self.entities.get(&entity).unwrap();
-        e.clone()
+    pub fn get_entity_clone(&self, entity: Id) -> Result<Entity> {
+        let e = self
+            .entities
+            .get(&entity)
+            .ok_or(anyhow!("Entity with id {} not found", entity))?;
+        Ok(e.clone())
     }
     pub fn get_all_living_entities(&self) -> Vec<Id> {
         self.entities
