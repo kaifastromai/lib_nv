@@ -7,7 +7,7 @@ use ::common::uuid;
 use nvproc::{undo_action, Resource};
 use std::cell::Cell;
 use std::hash::Hash;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{
     any::Any,
     collections::{HashMap, VecDeque},
@@ -69,19 +69,38 @@ pub trait RvTy: Any + dyn_clone::DynClone {}
 impl<T: Any + dyn_clone::DynClone> RvTy for T {}
 dyn_clone::clone_trait_object!(RvTy);
 pub struct ReturnValue<Rv: RvTy + Clone> {
-    pub rv: Option<Rv>,
+    rv: Arc<Mutex<Option<Box<dyn RvTy>>>>,
+    phantom: std::marker::PhantomData<Rv>,
 }
 impl<Rv: RvTy + Clone> ReturnValue<Rv> {
     pub fn new(rv: Option<Rv>) -> Self {
-        ReturnValue { rv }
+        let rv_val = match rv {
+            Some(rv) => Some(Box::new(rv) as Box<dyn RvTy>),
+            None => None,
+        };
+        Self {
+            rv: Arc::new(Mutex::new(rv_val)),
+            phantom: std::marker::PhantomData,
+        }
     }
+    pub fn from(rv: Arc<Mutex<Option<Box<dyn RvTy>>>>) -> Self {
+        Self {
+            rv,
+            phantom: std::marker::PhantomData,
+        }
+    }
+    ///Fill this return value with a new value.
     pub fn fill(&mut self, rv: Rv) {
-        self.rv = Some(rv);
+        let mut rv_val = self.rv.lock().unwrap();
+        *rv_val = Some(Box::new(rv) as Box<dyn RvTy>);
     }
     pub fn get(&self) -> Result<Rv> {
-        self.rv
-            .clone()
-            .ok_or(anyhow!("the return value has not been filled yet"))
+        let rv_val = self.rv.lock().unwrap();
+        match *rv_val {
+            Some(ref rv) => Ok(*(rv.clone() as Box<dyn Any>).downcast::<Rv>().unwrap()),
+
+            None => Err(anyhow!("No return value")),
+        }
     }
 }
 
@@ -143,11 +162,13 @@ impl<Rsrc: ResrcTy, P: Clone, Rv: RvTy, E: ExecTy<P, Rsrc, Rv>, U: UndoTy<Rsrc>>
             }?;
             (res)(mir, resrc);
             self.is_complete = false;
-        };
-        return Err(anyhow!(
+        }else {
+            return Err(anyhow!(
             "Action {} has not yet been completed and cannot be undone!",
             self.action_id
         ));
+        }
+        Ok(())
     }
 }
 impl<
@@ -184,83 +205,6 @@ impl<
         self.action_id = id;
     }
 }
-///An [Action] represents something that induce a change in the current state of the kernel, that is on [Mir].
-///An action contains two functions, one that executes the action, and optionaly one that undoes the action.
-///The executor takes a reference to the mir, and a generic parameter P that is the type of the parameter
-///The undoer takes a reference to the mir, and a generic parameter R that is the type of the resource
-/* pub struct Action<'a, R: ResrcTy, P: Clone> {
-    pub action_id: u128,
-    pub param: P,
-    exec: &'a dyn Fn(&mut Mir, P) -> Result<Box<R>>,
-    undo: Option<&'a dyn Fn(&mut Mir, Resrc<&R>) -> Result<()>>,
-    pub is_complete: bool,
-}
-impl<'a, R: ResrcTy, P: Clone> Action<'a, R, P> {
-    //Create a new action, specifying the function to execute and the function that undoes the action
-    pub fn new(
-        exec: &'a impl Fn(&mut Mir, P) -> Result<Box<R>>,
-        undo: &'a impl Fn(&mut Mir, Resrc<&R>) -> Result<()>,
-        param: P,
-    ) -> Self {
-        Action {
-            is_complete: false,
-            exec,
-            undo: Some(undo),
-            param,
-            action_id: 0,
-        }
-    }
-    //Create a new action, only specifying the function to execute. This action will NOT be undoable
-    pub fn new_pure(exec: &'a impl Fn(&mut Mir, P) -> Result<Box<R>>, param: P) -> Self {
-        Action {
-            is_complete: false,
-            exec,
-            undo: None,
-            param,
-            action_id: 0,
-        }
-    }
-    pub fn exec(&mut self, mir: &mut Mir) -> Result<Box<R>> {
-        self.is_complete = true;
-        (self.exec)(mir, self.param.clone())
-    }
-    pub fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&R>) -> Result<()> {
-        if self.is_complete {
-            let res = match self.undo {
-                Some(u) => Ok(u),
-                None => Err(anyhow!("This action has no undo!")),
-            }?;
-            (res)(mir, resrc);
-            self.is_complete = false;
-        };
-        return Err(anyhow!(
-            "Action {} has not yet been completed and cannot be undone!",
-            self.action_id
-        ));
-    }
-}
-impl<'a, R: ResrcTy + Clone + 'static, P: Clone> ActionTy for Action<'a, R, P> {
-    fn exec(&mut self, mir: &mut Mir) -> Result<Box<dyn ResrcTy>> {
-        let res = self.exec(mir)?;
-        //convert R to Box<dyn ResrcTy>
-        let r = (Box::from(*res) as Box<dyn ResrcTy>);
-        //convert to to box
-        Ok(r)
-    }
-    fn undo(&mut self, mir: &mut Mir, resrc: Resrc<&mut dyn ResrcTy>) -> Result<()> {
-        let rsrc = resrc.into_type();
-        let r = rsrc.get_mut().downcast_ref::<R>().unwrap();
-        let boxed = Box::from(r.clone());
-        self.undo(mir, Resrc::new(r))
-    }
-    fn action_id(&self) -> u128 {
-        self.action_id
-    }
-    fn set_id(&mut self, id: u128) {
-        self.action_id = id;
-    }
-} */
-//Actman manages the actions and any resources that they may need.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ActionCursor {
@@ -331,7 +275,9 @@ impl std::ops::SubAssign<usize> for ActionCursor {
 pub struct Actman<'ac> {
     pub actions: VecDeque<Box<dyn ActionTy + 'ac>>,
     pub resources: HashMap<u128, Box<dyn ResrcTy>>,
-    pub return_values: HashMap<u128, Arc<Cell<Option<Box<dyn RvTy>>>>>,
+    ///Return values for actions. Not all actions will have a return value, and so it 
+    /// represented as an Option. 
+    pub return_values: HashMap<u128, Option<Arc<Mutex<Option<Box<dyn RvTy>>>>>>,
     //indicates position in undo
     pub cursor: ActionCursor,
 }
@@ -351,32 +297,34 @@ impl<'ac> Actman<'ac> {
         if self.cursor.cursor > 0 {
             self.actions.drain(self.cursor.cursor as usize..);
         }
+        self.return_values.insert(action.action_id(), None);
         self.cursor = self.actions.len().into();
         self.actions.push_front(Box::new(action));
     }
+
+    ///Register a new action that is expected to return a value.
     pub fn register_action_with_rv<
         Rsrc: ResrcTy + Clone + 'static,
-        P: Clone + 'static,
+        Param: Clone + 'static,
         Rv: RvTy + Clone + 'static,
-        E: ExecTy<P, Rsrc, Rv> + 'static,
+        E: ExecTy<Param, Rsrc, Rv> + 'static,
         U: UndoTy<Rsrc> + 'static,
     >(
         &mut self,
-        action: StaticAction<Rsrc, P, Rv, E, U>,
-    ) -> Arc<Option<Cell<Box<Rv>>>> {
+        action: StaticAction<Rsrc, Param, Rv, E, U>,
+    ) -> ReturnValue<Rv> {
         //if the actioncursor is not at the front of the queue,
         //we must invalidate everything after the cursor
         if self.cursor.cursor > 0 {
             self.actions.drain(self.cursor.cursor as usize..);
         }
         self.return_values
-            .insert(action.action_id(), Arc::new(Cell::new(None)));
+            .insert(action.action_id(), Some(Arc::new(Mutex::new(None))));
         let r = self.return_values.get(&action.action_id()).unwrap().clone();
 
-        let res = unsafe { std::mem::transmute::<_, Arc<Option<Cell<Box<Rv>>>>>(r) };
         self.cursor = self.actions.len().into();
         self.actions.push_front(Box::new(action));
-        res
+        ReturnValue::from(r.unwrap())
     }
     //Advances the action cursor forward by one. If the cursor is in sync with the latest action
     //(at the front of queue),this does nothing. Otherwise, it executes the action at the current cursors location,
@@ -386,13 +334,22 @@ impl<'ac> Actman<'ac> {
             return Err(anyhow!("Cursor is not valid!"));
         }
         let mut action = self.actions.get_mut(self.cursor.into()).unwrap();
+
         //execute and collect any resources
         let (rsrc, retval) = action.exec(mir)?;
         let a = self
             .return_values
             .get_mut(&action.action_id())
-            .ok_or(anyhow!("Could not find return value"))?;
-        a.set(Some(retval));
+            .expect("Action id not found!");
+
+        match a {
+            Some(r) => {
+                let mut rv = a.as_ref().unwrap().lock().unwrap();
+                *rv = Some(retval);
+            }
+            None => {}
+        }
+
         //generate a resource id
         let resource_id = uuid::gen_128();
         action.set_id(resource_id);

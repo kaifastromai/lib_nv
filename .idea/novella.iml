@@ -47,6 +47,9 @@
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde-6eaed104c44eabfd/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde_derive-4f01dccc47c4df20/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde_json-240bab5140dd2e8c/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/components_track/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/nvfs/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/sdsl/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

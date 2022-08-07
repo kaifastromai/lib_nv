@@ -50,8 +50,8 @@ fn test_action_register() {
 
     let mut act = Actman::new();
     act.register_action(action);
-    act.advance(&mut mir);
-    act.regress(&mut mir);
+    act.advance(&mut mir).unwrap();
+    act.regress(&mut mir).unwrap();
 
     assert_eq!(mir.exec(|m| { m.em.get_entity_count() }), 0);
 }
@@ -74,8 +74,8 @@ fn test_action_constructor() {
 
     //mir should now have one entity
     assert_eq!(mir.em.get_entity_count(), 1);
-    assert!(ret_val.is_some());
+    assert!(ret_val.get().is_ok());
     //make sure the returned id is valid
-    let id = ret_val.unwrap().take();
-    assert!(mir.em.get_entity_clone(*id).is_ok());
+    let id = ret_val.get().unwrap();
+    assert!(mir.em.get_entity_clone(id).is_ok());
 }
