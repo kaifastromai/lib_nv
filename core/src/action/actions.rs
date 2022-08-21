@@ -1,4 +1,4 @@
-/*! The [actions] module contains a number of preconfigured [ActionTy]'s for convenince purposes*/
+/*! The [actions] module contains a number of preconfigured [ActionTy]'s for convenience purposes*/
 use super::*;
 use crate::{
     ecs::{Component, ComponentTy, ComponentTyReqs, DynamicComponent, EntityOwned, Id},
@@ -34,7 +34,7 @@ pub fn ae_remove_entity(mir: &mut Mir, id: Id) -> Result<Box<(EntityOwned, ())>>
 }
 ///Undo remove entity function.
 pub fn au_remove_entity(mir: &mut Mir, entity_owned: Resrc<&EntityOwned>) -> Result<()> {
-    mir.em.entity_from_owned(entity_owned.into_type().clone());
+    mir.em.entity_from_owned(entity_owned.into_type().clone())?;
     Ok(())
 }
 ///Add component to an entity with the given [Id]
@@ -55,20 +55,7 @@ pub fn au_add_component(mir: &mut Mir, r: Resrc<&(Id, common::type_id::TypeId)>)
 type Executor<P, Rsrc: ResrcTy, Rv: RvTy> = fn(&mut Mir, P) -> Result<Box<(Rsrc, Rv)>>;
 type Undoer<R> = fn(&mut Mir, Resrc<&R>) -> Result<()>;
 
-///Generates a StaticAction. the arguments are:
-/// - the name of the action
-/// - the Param type of the action
-/// - the resource type of the action
-/// - the Executor function of the action
-/// - the Undoer function of the action. This is an Option<[Undoer<R>]>
-/// - the id of this action. This must be unique. This is used to identify the action in the action manager.
-/// All static actions should have uppercase snake case names that begin with "AP_" for pure actions (actions that are not undoable) and "AU_" for undoable actions.
-// macro_rules! static_action {
-//     ($name:ident, $param:tt, $resrc:tt,$exec:tt,$undo:tt,$id:literal) => {
-//         static $name: StaticAction<$resrc, $param, Executor<$param, $resrc>, Undoer<$resrc>> =
-//             StaticAction::new($param, $exec, $undo, $id);
-//     };
-// }
+
 
 ///Action constructors generate actions.
 pub trait ActionConstructorTy {
