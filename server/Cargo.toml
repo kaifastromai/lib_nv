@@ -6,6 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rocket = { version = "0.5.0-rc.2", features = ["json"] }
 nvcore = { version = "*", path = "../core" }
+tonic={version="0.8"}
+tokio={version = "1.0", features = ["macros", "rt-multi-thread"]}
+prost="*"
 common={version="*",path="../common"}
+
+
+[build-dependencies]
+tonic-build={version="0.8", features = ["prost"]}
